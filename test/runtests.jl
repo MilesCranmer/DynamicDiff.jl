@@ -158,6 +158,7 @@ end
     using DynamicAutodiff: D
     using SymbolicRegression: ComposableExpression, Node
     using DynamicExpressions: OperatorEnum, AbstractExpression
+    using DynamicExpressions.ExpressionAlgebraModule: MissingOperatorError
 
     # Basic setup
     operators = OperatorEnum(; binary_operators=(+, *, /, -), unary_operators=(sin, cos))
@@ -165,7 +166,7 @@ end
     x1 = ComposableExpression(Node(Float64; feature=1); operators, variable_names)
 
     # Test for the error when 'sinh' is not in the operator set
-    @test_throws "Operator sinh not found" repr(D(sinh(x1), 1))
+    @test_throws MissingOperatorError repr(D(sinh(x1), 1))
 end
 
 @testitem "Test higher-order derivatives of inverse functions" begin
