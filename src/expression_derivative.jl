@@ -21,19 +21,9 @@ function D(ex::AbstractExpression, feature::Integer)
     nuna = length(operators.unaops)
     tree = DE.get_contents(ex)
     operators_with_derivatives = _make_derivative_operators(operators)
-    evaluates_to_constant = map(
-        op -> if op == _zero
-            Zero
-        elseif op == _one
-            One
-        elseif op == _n_one
-            NegOne
-        else
-            NonConstant
-        end, operators_with_derivatives.binops
-    )
+    simplifies_to = map(_classify_operator, operators_with_derivatives.binops)
     ctx = SymbolicDerivativeContext(;
-        feature, plus_idx, mult_idx, nbin, nuna, evaluates_to_constant
+        feature, plus_idx, mult_idx, nbin, nuna, simplifies_to
     )
     d_tree = _symbolic_derivative(tree, ctx)
     return DE.with_metadata(
@@ -42,7 +32,14 @@ function D(ex::AbstractExpression, feature::Integer)
 end
 
 # Used to declare if an operator will always evaluate to a constant.
-Base.@enum EvaluatesToConstant::UInt8 Zero One NegOne NonConstant
+Base.@enum SimplifiesTo::UInt8 NonConstant Zero One NegOne Last First
+
+_classify_operator(::F) where {F} = NonConstant
+_classify_operator(::typeof(_zero)) = Zero
+_classify_operator(::typeof(_one)) = One
+_classify_operator(::typeof(_n_one)) = NegOne
+_classify_operator(::typeof(_last)) = Last
+_classify_operator(::typeof(_first)) = First
 
 # Holds metadata about the derivative computation.
 Base.@kwdef struct SymbolicDerivativeContext{TUP}
@@ -51,7 +48,7 @@ Base.@kwdef struct SymbolicDerivativeContext{TUP}
     mult_idx::Int
     nbin::Int
     nuna::Int
-    evaluates_to_constant::TUP
+    simplifies_to::TUP
 end
 
 function _symbolic_derivative(
@@ -92,25 +89,29 @@ function _symbolic_derivative(
         # f(g(x), h(x)) => f^(1,0)(g(x), h(x)) * g'(x) + f^(0,1)(g(x), h(x)) * h'(x)
         f_prime_left_op = tree.op + ctx.nbin
         f_prime_right_op = tree.op + 2 * ctx.nbin
-        f_prime_left_evaluates_to = ctx.evaluates_to_constant[f_prime_left_op]
-        f_prime_right_evaluates_to = ctx.evaluates_to_constant[f_prime_right_op]
+        f_prime_left_simplifies_to = ctx.simplifies_to[f_prime_left_op]
+        f_prime_right_simplifies_to = ctx.simplifies_to[f_prime_right_op]
 
         ### We do some simplification based on zero/one derivatives ###
-        first_term = if f_prime_left_evaluates_to == Zero
+        first_term = if f_prime_left_simplifies_to == Zero
             # 0 * g' => 0
             constructorof(N)(; val=zero(T))
         else
             g_prime = _symbolic_derivative(tree.l, ctx)
 
-            if f_prime_left_evaluates_to == One
+            if f_prime_left_simplifies_to == One
                 # 1 * g' => g'
                 g_prime
             elseif g_prime.degree == 0 && g_prime.constant && iszero(g_prime.val)
                 # f' * 0 => 0
                 g_prime
             else
-                f_prime_left = if f_prime_left_evaluates_to == NegOne
+                f_prime_left = if f_prime_left_simplifies_to == NegOne
                     constructorof(N)(; val=-one(T))
+                elseif f_prime_left_simplifies_to == First
+                    tree.l
+                elseif f_prime_left_simplifies_to == Last
+                    tree.r
                 else
                     constructorof(N)(; op=f_prime_left_op, l=tree.l, r=tree.r)
                 end
@@ -125,18 +126,22 @@ function _symbolic_derivative(
             end
         end
 
-        second_term = if f_prime_right_evaluates_to == Zero
+        second_term = if f_prime_right_simplifies_to == Zero
             # Simplify and just give zero
             constructorof(N)(; val=zero(T))
         else
             h_prime = _symbolic_derivative(tree.r, ctx)
-            if f_prime_right_evaluates_to == One
+            if f_prime_right_simplifies_to == One
                 h_prime
             elseif h_prime.degree == 0 && h_prime.constant && iszero(h_prime.val)
                 h_prime
             else
-                f_prime_right = if f_prime_right_evaluates_to == NegOne
+                f_prime_right = if f_prime_right_simplifies_to == NegOne
                     constructorof(N)(; val=-one(T))
+                elseif f_prime_right_simplifies_to == First
+                    tree.l
+                elseif f_prime_right_simplifies_to == Last
+                    tree.r
                 else
                     constructorof(N)(; op=f_prime_right_op, l=tree.l, r=tree.r)
                 end

@@ -49,8 +49,8 @@ end
     @test D(sin(x1) * cos(x2), 1)([1.0], [2.0]) ≈ [cos(1.0) * cos(2.0)]
     @test D(D(sin(x1) * cos(x2), 1), 2)([1.0], [2.0]) ≈ [cos(1.0) * -sin(2.0)]
 
-    # Printing should also be nice:
-    @test repr(D(x1 * x2, 1)) == "last(x1, x2)"
+    # Also simplifies over `*`
+    @test repr(D(x1 * x2, 1)) == "x2"
 
     # We also have special behavior when there is no dependence:
     @test repr(D(sin(x2), 1)) == "0.0"
