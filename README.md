@@ -8,7 +8,7 @@
 [![Coverage](https://coveralls.io/repos/github/MilesCranmer/DynamicAutodiff.jl/badge.svg?branch=main)](https://coveralls.io/github/MilesCranmer/DynamicAutodiff.jl?branch=main)
 [![Aqua](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
-DynamicAutodiff.jl provides compilation-free symbolic differentiation for dynamic expressions. Built originally for [SymbolicRegression.jl](https://github.com/MilesCranmer/SymbolicRegression.jl), it is a generic library for computing derivatives of expressions that can change during runtime.
+DynamicAutodiff.jl provides compilation-free symbolic differentiation for dynamic expressions. Built originally for [SymbolicRegression.jl](https://github.com/MilesCranmer/SymbolicRegression.jl), it is a generic library for computing derivatives of runtime expressions.
 
 </div>
 
