@@ -148,8 +148,6 @@ operator_derivative(::DivMonomial{C,XP,YNP}, ::Val{2}, ::Val{2}) where {C,XP,YNP
     DivMonomial{-C * YNP,XP,YNP + 1}()
 #! format: on
 
-DE.get_op_name(::typeof(_first)) = "first"
-DE.get_op_name(::typeof(_last)) = "last"
 DE.get_op_name(::typeof(_n_sin)) = "-sin"
 DE.get_op_name(::typeof(_n_cos)) = "-cos"
 
