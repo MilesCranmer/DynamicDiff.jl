@@ -24,12 +24,15 @@ This works by extending the `OperatorEnum` contained within `ex` to include the 
 
 Evaluation then can simply use the efficiently vectorized `eval_tree_array` function from [DynamicExpressions.jl](https://github.com/SymbolicML/DynamicExpressions.jl).
 
-### Example
+## Performance
+
+Let's see an example.
 
 First, let's set up some variables with a given set of operators:
 
 ```julia
 using DynamicAutodiff, DynamicExpressions
+
 operators = OperatorEnum(; binary_operators=(+, *, /, -), unary_operators=(sin, cos));
 variable_names = ["x1", "x2", "x3"];
 x1, x2, x3 = (Expression(Node{Float64}(feature=i); operators, variable_names) for i in 1:3);
@@ -49,4 +52,34 @@ x1 * cos(x2 - 0.5)
 ```
 
 These symbolic derivatives are done by simply incrementing integers
-and arranging a binary tree, so this process is _very_ fast.
+and arranging a binary tree, so this process is _very_ fast:
+
+```julia
+julia> using BenchmarkTools
+
+julia> @btime D($f, 2);
+  52.865 ns (5 allocations: 240 bytes)
+```
+
+This isn't compiled or cached!
+To show this, let's randomly generate arbitrary expressions and then take derivatives of them:
+
+```julia
+julia> @btime D(g, 1) setup=(g = [x1, x2, x3][rand(1:3)] * sin([x1, x2, x3][rand(1:3)] - randn())) evals=100
+  60.270 ns (2 allocations: 80 bytes)
+```
+
+These expressions can then be evaluated using [DynamicExpressions.jl](https://github.com/SymbolicML/DynamicExpressions.jl):
+
+```julia
+julia> df([1.0 2.0]')
+1-element Vector{Float64}:
+ 0.9974949866040544
+```
+
+Again, this is very fast. Let's see 32 batches at once:
+
+```julia
+julia> @btime D($f, 1)(x) setup=(x = randn(2, 32));
+  187.132 ns (4 allocations: 416 bytes)
+```
