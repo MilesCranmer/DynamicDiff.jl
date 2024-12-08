@@ -44,12 +44,21 @@ jobs:
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-runtest@v1
+      - name: "Run tests"
+        shell: bash
         env:
           DA_JET_TEST: ${{ matrix.jet }}
-      - uses: julia-actions/julia-uploadcoveralls@v1
-        env:
-          COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
+        run: |
+          julia --color=yes -e 'import Pkg; Pkg.add("Coverage")'
+          julia --color=yes --threads=auto --check-bounds=yes --depwarn=yes --code-coverage=user -e 'import Coverage; import Pkg; Pkg.activate("."); Pkg.test(coverage=true)'
+          julia --color=yes coverage.jl
+      - name: "Coveralls"
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          file: lcov.info
+          parallel: true
+          flag-name: julia-${{ matrix.version }}-${{ matrix.os }}${{ matrix.jet == '1' && '-jet' || '' }}
   docs:
     name: Documentation
     runs-on: ubuntu-latest
