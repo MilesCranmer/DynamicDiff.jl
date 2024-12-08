@@ -19,12 +19,21 @@ end
 end
 
 @testitem "Test symbolic derivatives" begin
-    using DynamicAutodiff: D
+    using DynamicAutodiff: D, _one, _n_one
+    import DynamicAutodiff: operator_derivative
     using SymbolicRegression: ComposableExpression, Node
     using DynamicExpressions: OperatorEnum, @declare_expression_operator, AbstractExpression
 
+    # Since no current operators exist for -one on the left arg, we define one:
+    reverse_minus(x, y) = -x + y
+    @declare_expression_operator(reverse_minus, 2)
+    operator_derivative(::typeof(reverse_minus), ::Val{2}, ::Val{1}) = _n_one
+    operator_derivative(::typeof(reverse_minus), ::Val{2}, ::Val{2}) = _one
+
     # Basic setup
-    operators = OperatorEnum(; binary_operators=(+, *, /, -), unary_operators=(sin, cos))
+    operators = OperatorEnum(;
+        binary_operators=(+, *, /, -, reverse_minus), unary_operators=(sin, cos)
+    )
     variable_names = ["x1", "x2"]
     x1 = ComposableExpression(Node(Float64; feature=1); operators, variable_names)
     x2 = ComposableExpression(Node(Float64; feature=2); operators, variable_names)
@@ -42,6 +51,11 @@ end
     @test D(D(x1 * x2, 1), 2)([1.0], [2.0]) ≈ [1.0]
     @test D(D(3.0 * x1 * x2 - x2, 1), 2)([1.0], [2.0]) ≈ [3.0]
     @test D(D(x1 * x2, 1), 1)([1.0], [2.0]) ≈ [0.0]
+
+    @test repr(D(x1 - x2, 1)) == "1.0"
+    @test repr(D(x1 - x2, 2)) == "-1.0"
+    @test repr(D(reverse_minus(x1, x2), 1)) == "-1.0"
+    @test repr(D(reverse_minus(x1, x2), 2)) == "1.0"
 
     # Unary operators:
     @test D(sin(x1), 1)([1.0]) ≈ [cos(1.0)]
