@@ -44,8 +44,11 @@ end
     @test D(c, 1)([1.0]) ≈ [0.0]
     @test D(x1 + x2, 1)([0.0], [0.0]) ≈ [1.0]
     @test D(x1 + x2 * x2, 2)([0.0], [2.0]) ≈ [4.0]
-
     @test D(x1 * x2, 1)([1.0], [2.0]) ≈ [2.0]
+
+    # Test inference
+    @inferred D(x1 * x2, 1)
+    @inferred D(x1 * x2, 2)
 
     # Second order!
     @test D(D(x1 * x2, 1), 2)([1.0], [2.0]) ≈ [1.0]
