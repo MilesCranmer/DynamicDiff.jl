@@ -68,14 +68,17 @@ end
 _zero(x) = zero(x)
 _one(x) = one(x)
 _n_one(x) = -one(x)
+# COV_EXCL_START
 operator_derivative(::typeof(_zero), ::Val{1}, ::Val{1}) = _zero
 operator_derivative(::typeof(_one), ::Val{1}, ::Val{1}) = _zero
 operator_derivative(::typeof(_n_one), ::Val{1}, ::Val{1}) = _zero
+# COV_EXCL_STOP
 
 ## Unary
 ### Trigonometric
 _n_sin(x) = -sin(x)
 _n_cos(x) = -cos(x)
+# COV_EXCL_START
 operator_derivative(::typeof(sin), ::Val{1}, ::Val{1}) = cos
 operator_derivative(::typeof(cos), ::Val{1}, ::Val{1}) = _n_sin
 operator_derivative(::typeof(_n_sin), ::Val{1}, ::Val{1}) = _n_cos
@@ -93,6 +96,7 @@ operator_derivative(::typeof(sign), ::Val{1}, ::Val{1}) = _zero
 ### Identity and Negation
 operator_derivative(::typeof(identity), ::Val{1}, ::Val{1}) = _one
 operator_derivative(::typeof(-), ::Val{1}, ::Val{1}) = _n_one
+# COV_EXCL_STOP
 
 ### Inverse
 struct InvMonomial{C,XNP} <: Function end
@@ -107,6 +111,7 @@ operator_derivative(::InvMonomial{C,XNP}, ::Val{1}, ::Val{1}) where {C,XNP} =
 
 ### Helper Functions
 # TODO: We assume that left/right are symmetric here!
+# COV_EXCL_START
 _zero(x, _) = zero(x)
 _one(x, _) = one(x)
 _n_one(x, _) = -one(x)
@@ -122,16 +127,20 @@ operator_derivative(::typeof(+), ::Val{2}, ::Val{1}) = _one
 operator_derivative(::typeof(+), ::Val{2}, ::Val{2}) = _one
 operator_derivative(::typeof(-), ::Val{2}, ::Val{1}) = _one
 operator_derivative(::typeof(-), ::Val{2}, ::Val{2}) = _n_one
+# COV_EXCL_STOP
 
 ### Multiplication
 _last(_, y) = y
 _first(x, _) = x
+
+# COV_EXCL_START
 operator_derivative(::typeof(*), ::Val{2}, ::Val{1}) = _last
 operator_derivative(::typeof(*), ::Val{2}, ::Val{2}) = _first
 operator_derivative(::typeof(_first), ::Val{2}, ::Val{1}) = _one
 operator_derivative(::typeof(_first), ::Val{2}, ::Val{2}) = _zero
 operator_derivative(::typeof(_last), ::Val{2}, ::Val{1}) = _zero
 operator_derivative(::typeof(_last), ::Val{2}, ::Val{2}) = _one
+# COV_EXCL_STOP
 
 ### Division
 struct DivMonomial{C,XP,YNP} <: Function end
@@ -148,8 +157,10 @@ operator_derivative(::DivMonomial{C,XP,YNP}, ::Val{2}, ::Val{2}) where {C,XP,YNP
     DivMonomial{-C * YNP,XP,YNP + 1}()
 #! format: on
 
+# COV_EXCL_START
 DE.get_op_name(::typeof(_n_sin)) = "-sin"
 DE.get_op_name(::typeof(_n_cos)) = "-cos"
+# COV_EXCL_STOP
 
 function DE.get_op_name(::InvMonomial{C,XNP}) where {C,XNP}
     num_derivatives = XNP - 1
@@ -170,9 +181,11 @@ end
 # simplify expressions.
 Base.@enum SimplifiesTo::UInt8 NonConstant Zero One NegOne Last First
 
+# COV_EXCL_START
 _classify_operator(::F) where {F} = NonConstant
 _classify_operator(::typeof(_zero)) = Zero
 _classify_operator(::typeof(_one)) = One
 _classify_operator(::typeof(_n_one)) = NegOne
 _classify_operator(::typeof(_last)) = Last
 _classify_operator(::typeof(_first)) = First
+# COV_EXCL_STOP
