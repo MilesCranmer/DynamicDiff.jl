@@ -1,5 +1,3 @@
-using Compat: Fix
-using ForwardDiff: ForwardDiff
 using DynamicExpressions:
     AbstractExpression,
     AbstractExpressionNode,

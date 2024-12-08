@@ -1,3 +1,6 @@
+using Compat: Fix
+using ForwardDiff: ForwardDiff
+
 """
     OperatorDerivative{F,degree,arg} <: Function
 
