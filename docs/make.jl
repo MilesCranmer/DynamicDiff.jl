@@ -1,7 +1,9 @@
 using DynamicAutodiff
 using Documenter
 
-DocMeta.setdocmeta!(DynamicAutodiff, :DocTestSetup, :(using DynamicAutodiff); recursive=true)
+DocMeta.setdocmeta!(
+    DynamicAutodiff, :DocTestSetup, :(using DynamicAutodiff); recursive=true
+)
 
 makedocs(;
     modules=[DynamicAutodiff],
@@ -12,12 +14,7 @@ makedocs(;
         edit_link="main",
         assets=String[],
     ),
-    pages=[
-        "Home" => "index.md",
-    ],
+    pages=["Home" => "index.md"],
 )
 
-deploydocs(;
-    repo="github.com/MilesCranmer/DynamicAutodiff.jl",
-    devbranch="main",
-)
+deploydocs(; repo="github.com/MilesCranmer/DynamicAutodiff.jl", devbranch="main")
