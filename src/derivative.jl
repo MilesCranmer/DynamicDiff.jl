@@ -226,8 +226,8 @@ operator_derivative(::typeof(-), ::Val{2}, ::Val{1}) = _one
 operator_derivative(::typeof(-), ::Val{2}, ::Val{2}) = _n_one
 
 ### Multiplication
-_last(x, _) = x
-_first(_, y) = y
+_last(_, y) = y
+_first(x, _) = x
 operator_derivative(::typeof(*), ::Val{2}, ::Val{1}) = _last
 operator_derivative(::typeof(*), ::Val{2}, ::Val{2}) = _first
 operator_derivative(::typeof(_first), ::Val{2}, ::Val{1}) = _one
