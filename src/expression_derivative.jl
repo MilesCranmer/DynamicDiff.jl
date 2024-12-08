@@ -31,16 +31,6 @@ function D(ex::AbstractExpression, feature::Integer)
     )
 end
 
-# Used to declare if an operator will always evaluate to a constant.
-Base.@enum SimplifiesTo::UInt8 NonConstant Zero One NegOne Last First
-
-_classify_operator(::F) where {F} = NonConstant
-_classify_operator(::typeof(_zero)) = Zero
-_classify_operator(::typeof(_one)) = One
-_classify_operator(::typeof(_n_one)) = NegOne
-_classify_operator(::typeof(_last)) = Last
-_classify_operator(::typeof(_first)) = First
-
 # Holds metadata about the derivative computation.
 Base.@kwdef struct SymbolicDerivativeContext{TUP}
     feature::Int

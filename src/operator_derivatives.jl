@@ -62,8 +62,18 @@ function (d::OperatorDerivative{F,2,2})(x, y) where {F}
 end
 
 #! format: off
-# Special Cases
+# Special Cases (only ones we can implement "closed loops" for)
+
+## Helper Functions
+_zero(x) = zero(x)
+_one(x) = one(x)
+_n_one(x) = -one(x)
+operator_derivative(::typeof(_zero), ::Val{1}, ::Val{1}) = _zero
+operator_derivative(::typeof(_one), ::Val{1}, ::Val{1}) = _zero
+operator_derivative(::typeof(_n_one), ::Val{1}, ::Val{1}) = _zero
+
 ## Unary
+### Trigonometric
 _n_sin(x) = -sin(x)
 _n_cos(x) = -cos(x)
 operator_derivative(::typeof(sin), ::Val{1}, ::Val{1}) = cos
@@ -72,7 +82,30 @@ operator_derivative(::typeof(_n_sin), ::Val{1}, ::Val{1}) = _n_cos
 operator_derivative(::typeof(_n_cos), ::Val{1}, ::Val{1}) = sin
 operator_derivative(::typeof(exp), ::Val{1}, ::Val{1}) = exp
 
+### Hyperbolic
+operator_derivative(::typeof(sinh), ::Val{1}, ::Val{1}) = cosh
+operator_derivative(::typeof(cosh), ::Val{1}, ::Val{1}) = sinh
+
+### Absolute Value
+operator_derivative(::typeof(abs), ::Val{1}, ::Val{1}) = sign
+operator_derivative(::typeof(sign), ::Val{1}, ::Val{1}) = _zero
+
+### Identity and Negation
+operator_derivative(::typeof(identity), ::Val{1}, ::Val{1}) = _one
+operator_derivative(::typeof(-), ::Val{1}, ::Val{1}) = _n_one
+
+### Inverse
+struct InvMonomial{C,XNP} <: Function end
+function (i::InvMonomial{C,XNP})(x) where {C,XNP}
+    return inv(x^XNP) * C
+end
+operator_derivative(::typeof(inv), ::Val{1}, ::Val{1}) = InvMonomial{-1,2}()
+operator_derivative(::InvMonomial{C,XNP}, ::Val{1}, ::Val{1}) where {C,XNP} =
+    InvMonomial{-C * XNP,XNP + 1}()
+
 ## Binary
+
+### Helper Functions
 # TODO: We assume that left/right are symmetric here!
 _zero(x, _) = zero(x)
 _one(x, _) = one(x)
@@ -118,6 +151,21 @@ DE.get_op_name(::typeof(_last)) = "last"
 DE.get_op_name(::typeof(_n_sin)) = "-sin"
 DE.get_op_name(::typeof(_n_cos)) = "-cos"
 
+function DE.get_op_name(::InvMonomial{C,XNP}) where {C,XNP}
+    return join(("(x -> ", string(C), "/x^", string(XNP), ")"))
+end
 function DE.get_op_name(::DivMonomial{C,XP,YNP}) where {C,XP,YNP}
     return join(("((x, y) -> ", string(C), "x^", string(XP), "/y^", string(YNP), ")"))
 end
+
+# Used to declare if an operator will always evaluate to a constant.
+# This gets used in the expression derivative code to automatically
+# simplify expressions.
+Base.@enum SimplifiesTo::UInt8 NonConstant Zero One NegOne Last First
+
+_classify_operator(::F) where {F} = NonConstant
+_classify_operator(::typeof(_zero)) = Zero
+_classify_operator(::typeof(_one)) = One
+_classify_operator(::typeof(_n_one)) = NegOne
+_classify_operator(::typeof(_last)) = Last
+_classify_operator(::typeof(_first)) = First
