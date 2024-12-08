@@ -18,7 +18,7 @@ end
     Aqua.test_all(DynamicAutodiff)
 end
 
-@testitem "Test symbolic derivatives" tags = [:part2] begin
+@testitem "Test symbolic derivatives" begin
     using DynamicAutodiff: D
     using SymbolicRegression: ComposableExpression, Node
     using DynamicExpressions: OperatorEnum, @declare_expression_operator, AbstractExpression
@@ -83,27 +83,28 @@ end
     @test repr(D(my_bin_op(x, x - y), 2)) == "∂₂my_bin_op(x1, x1 - x2) * -1.0"
 end
 
-@testitem "Test template structure with derivatives" tags = [:part2] begin
-    using DynamicAutodiff: D
-    using SymbolicRegression:
-        ComposableExpression, Node, TemplateStructure, TemplateExpression
-    using DynamicExpressions: OperatorEnum
+## TODO: Add this back in once SR modifies `D`.
+# @testitem "Test template structure with derivatives" begin
+#     using DynamicAutodiff: D
+#     using SymbolicRegression:
+#         ComposableExpression, Node, TemplateStructure, TemplateExpression
+#     using DynamicExpressions: OperatorEnum
 
-    # Basic setup
-    operators = OperatorEnum(; binary_operators=(+, *, /, -), unary_operators=(sin, cos))
-    variable_names = ["x1", "x2"]
-    x1 = ComposableExpression(Node(Float64; feature=1); operators, variable_names)
-    x2 = ComposableExpression(Node(Float64; feature=2); operators, variable_names)
+#     # Basic setup
+#     operators = OperatorEnum(; binary_operators=(+, *, /, -), unary_operators=(sin, cos))
+#     variable_names = ["x1", "x2"]
+#     x1 = ComposableExpression(Node(Float64; feature=1); operators, variable_names)
+#     x2 = ComposableExpression(Node(Float64; feature=2); operators, variable_names)
 
-    # Create a structure that computes f(x1, x2) and its derivative with respect to x1
-    structure = TemplateStructure{(:f,)}(((; f), (x1, x2)) -> f(x1, x2) + D(f, 1)(x1, x2))
-    # We pass the functions through:
-    @test structure.num_features == (; f=2)
+#     # Create a structure that computes f(x1, x2) and its derivative with respect to x1
+#     structure = TemplateStructure{(:f,)}(((; f), (x1, x2)) -> f(x1, x2) + D(f, 1)(x1, x2))
+#     # We pass the functions through:
+#     @test structure.num_features == (; f=2)
 
-    # Test with a simple function and its derivative
-    expr = TemplateExpression((; f=x1 * sin(x2)); structure, operators, variable_names)
+#     # Test with a simple function and its derivative
+#     expr = TemplateExpression((; f=x1 * sin(x2)); structure, operators, variable_names)
 
-    # Truth: x1 * sin(x2) + sin(x2)
-    X = randn(2, 32)
-    @test expr(X) ≈ X[1, :] .* sin.(X[2, :]) .+ sin.(X[2, :])
-end
+#     # Truth: x1 * sin(x2) + sin(x2)
+#     X = randn(2, 32)
+#     @test expr(X) ≈ X[1, :] .* sin.(X[2, :]) .+ sin.(X[2, :])
+# end
