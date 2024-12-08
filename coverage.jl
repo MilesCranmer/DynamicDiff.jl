@@ -1,7 +1,6 @@
 using Coverage
 # process '*.cov' files
 coverage = process_folder() # defaults to src/; alternatively, supply the folder name as argument
-push!(coverage, process_folder("ext/")...)
 
 LCOV.writefile("lcov.info", coverage)
 
