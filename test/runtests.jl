@@ -228,3 +228,88 @@ end
     @test repr(D(expr_one, 1)) == "0.0"
     @test D(expr_one, 1)([2.0], [3.0]) ≈ [0.0]
 end
+
+@testitem "Test custom operators" begin
+    using DynamicExpressions: OperatorEnum, Expression, AbstractExpression
+    using DynamicExpressions: Node, @declare_expression_operator, get_op_name
+    using DynamicAutodiff: D
+
+    my_op(x) = x
+    my_bin_op(x, y) = x + y^2
+    @declare_expression_operator(my_op, 1)
+    @declare_expression_operator(my_bin_op, 2)
+    operators = OperatorEnum(; unary_operators=(my_op,), binary_operators=(+, *, my_bin_op))
+    x1, x2 = (
+        Expression(Node{Float64}(; feature=i); operators, variable_names=["x1", "x2"]) for
+        i in 1:2
+    )
+    ex1 = my_op(x1)
+    @test repr(D(ex1, 1)) == "∂my_op(x1)"
+    @test repr("text/plain", D(ex1, 1)) == "∂my_op(x1)"
+    @test D(ex1, 1)([3.0;;]) ≈ [1.0]
+
+    ex = my_bin_op(x1, x2)
+    @test repr(D(ex, 1)) == "∂₁my_bin_op(x1, x2)"
+    @test repr(D(ex, 2)) == "∂₂my_bin_op(x1, x2)"
+    @test D(ex, 1)([3.0 4.0]') ≈ [1.0]
+    @test D(ex, 2)([3.0 4.0]') ≈ [8.0]
+end
+
+@testitem "Missing coverage" begin
+    # Due to Coverage.jl missing inlined functions, we test explicitly
+    using DynamicAutodiff: D, _classify_operator, _zero, _one, _n_one, _first
+    using DynamicAutodiff: _last, _n_sin, _n_cos, operator_derivative, DivMonomial
+    using DynamicAutodiff: Zero, One, NegOne, First, Last, NonConstant
+    using DynamicExpressions: get_op_name
+
+    @test _zero(1.0) == 0.0
+    @test _one(1.0) == 1.0
+    @test _n_one(1.0) == -1.0
+    @test _first(1.0, 2.0) == 1.0
+    @test _last(1.0, 2.0) == 2.0
+
+    @test operator_derivative(_zero, Val(1), Val(1)) == _zero
+    @test operator_derivative(_zero, Val(2), Val(1)) == _zero
+    @test operator_derivative(_zero, Val(2), Val(2)) == _zero
+    @test operator_derivative(_one, Val(1), Val(1)) == _zero
+    @test operator_derivative(_one, Val(2), Val(1)) == _zero
+    @test operator_derivative(_one, Val(2), Val(2)) == _zero
+
+    @test operator_derivative(sin, Val(1), Val(1)) == cos
+    @test operator_derivative(cos, Val(1), Val(1)) == _n_sin
+    @test operator_derivative(_n_sin, Val(1), Val(1)) == _n_cos
+    @test operator_derivative(_n_cos, Val(1), Val(1)) == sin
+    @test operator_derivative(exp, Val(1), Val(1)) == exp
+
+    @test _n_sin(1.0) == -sin(1.0)
+    @test _n_cos(1.0) == -cos(1.0)
+
+    @test get_op_name(_n_sin) == "-sin"
+    @test get_op_name(_n_cos) == "-cos"
+
+    @test _classify_operator(_n_sin) == NonConstant
+    @test _classify_operator(_n_cos) == NonConstant
+    @test _classify_operator(_zero) == Zero
+    @test _classify_operator(_one) == One
+    @test _classify_operator(_n_one) == NegOne
+    @test _classify_operator(_first) == First
+    @test _classify_operator(_last) == Last
+
+    @test operator_derivative(abs, Val(1), Val(1)) == sign
+    @test operator_derivative(sign, Val(1), Val(1)) == _zero
+
+    @test operator_derivative(identity, Val(1), Val(1)) == _one
+    @test operator_derivative(-, Val(1), Val(1)) == _n_one
+
+    @test operator_derivative(+, Val(2), Val(1)) == _one
+    @test operator_derivative(+, Val(2), Val(2)) == _one
+    @test operator_derivative(-, Val(2), Val(1)) == _one
+    @test operator_derivative(-, Val(2), Val(2)) == _n_one
+
+    @test operator_derivative(*, Val(2), Val(1)) == _last
+    @test operator_derivative(*, Val(2), Val(2)) == _first
+
+    @test operator_derivative(/, Val(2), Val(1)) == DivMonomial{1,0,1}()
+    @test operator_derivative(operator_derivative(/, Val(2), Val(2)), Val(2), Val(2)) isa
+        DivMonomial{2,1,3}
+end
