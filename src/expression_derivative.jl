@@ -21,7 +21,10 @@ function D(ex::AbstractExpression, feature::Integer)
     nuna = length(operators.unaops)
     tree = DE.get_contents(ex)
     operators_with_derivatives = _make_derivative_operators(operators)
-    simplifies_to = map(_classify_operator, operators_with_derivatives.binops)
+    simplifies_to = (;
+        unaops=map(_classify_operator, operators_with_derivatives.unaops),
+        binops=map(_classify_operator, operators_with_derivatives.binops),
+    )
     ctx = SymbolicDerivativeContext(;
         feature, plus_idx, mult_idx, nbin, nuna, simplifies_to
     )
@@ -59,28 +62,41 @@ function _symbolic_derivative(
     elseif tree.degree == 1
         # f(g(x)) => f'(g(x)) * g'(x)
         f_prime_op = tree.op + ctx.nuna
+        f_prime_simplifies_to = ctx.simplifies_to.unaops[f_prime_op]
 
         ### We do some simplification based on zero/one derivatives ###
-        g_prime = _symbolic_derivative(tree.l, ctx)
-        if g_prime.degree == 0 && g_prime.constant && iszero(g_prime.val)
-            # f' * 0 => 0
-            return g_prime
+        if f_prime_simplifies_to == Zero
+            # 0 * g' => 0
+            return constructorof(N)(; val=zero(T))
         else
-            f_prime = constructorof(N)(; op=f_prime_op, l=tree.l)
-
-            if g_prime.degree == 0 && g_prime.constant && isone(g_prime.val)
-                # f' * 1 => f'
-                return f_prime
+            g_prime = _symbolic_derivative(tree.l, ctx)
+            if g_prime.degree == 0 && g_prime.constant && iszero(g_prime.val)
+                # f' * 0 => 0
+                return g_prime
             else
-                return constructorof(N)(; op=ctx.mult_idx, l=f_prime, r=g_prime)
+                f_prime = if f_prime_simplifies_to == NegOne
+                    constructorof(N)(; val=-one(T))
+                else
+                    constructorof(N)(; op=f_prime_op, l=tree.l)
+                end
+
+                if f_prime_simplifies_to == One
+                    # 1 * g' => g'
+                    return g_prime
+                elseif g_prime.degree == 0 && g_prime.constant && isone(g_prime.val)
+                    # f' * 1 => f'
+                    return f_prime
+                else
+                    return constructorof(N)(; op=ctx.mult_idx, l=f_prime, r=g_prime)
+                end
             end
         end
     else  # tree.degree == 2
         # f(g(x), h(x)) => f^(1,0)(g(x), h(x)) * g'(x) + f^(0,1)(g(x), h(x)) * h'(x)
         f_prime_left_op = tree.op + ctx.nbin
         f_prime_right_op = tree.op + 2 * ctx.nbin
-        f_prime_left_simplifies_to = ctx.simplifies_to[f_prime_left_op]
-        f_prime_right_simplifies_to = ctx.simplifies_to[f_prime_right_op]
+        f_prime_left_simplifies_to = ctx.simplifies_to.binops[f_prime_left_op]
+        f_prime_right_simplifies_to = ctx.simplifies_to.binops[f_prime_right_op]
 
         ### We do some simplification based on zero/one derivatives ###
         first_term = if f_prime_left_simplifies_to == Zero

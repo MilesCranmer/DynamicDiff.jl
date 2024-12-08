@@ -138,7 +138,9 @@ struct DivMonomial{C,XP,YNP} <: Function end
 function (m::DivMonomial{C,XP,YNP})(x, y) where {C,XP,YNP}
     return C * (XP == 0 ? one(x) : x^XP) / (y^YNP)
 end
+# ∂₁(x / y) => 1 / y
 operator_derivative(::typeof(/), ::Val{2}, ::Val{1}) = DivMonomial{1,0,1}()
+# ∂₂(x / y) => -x / y^2
 operator_derivative(::typeof(/), ::Val{2}, ::Val{2}) = DivMonomial{-1,1,2}()
 operator_derivative(::DivMonomial{C,XP,YNP}, ::Val{2}, ::Val{1}) where {C,XP,YNP} =
     iszero(XP) ? _zero : DivMonomial{C * XP,XP - 1,YNP}()
