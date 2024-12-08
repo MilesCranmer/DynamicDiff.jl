@@ -118,6 +118,7 @@ end
     @test repr(D(x1 / x2, 2)) == "∂₂[/](x1, x2)"
     @test repr(D(D(x1 / x2, 1), 2)) == "∂₁∂₂[/](x1, x2)"
     @test repr(D(D(D(x1 / x2, 1), 2), 2)) == "∂₁∂₂∂₂[/](x1, x2)"
+    # Test different order gives same string:
     @test repr(D(D(D(x1 / x2, 2), 2), 1)) == "∂₁∂₂∂₂[/](x1, x2)"
     @test repr(D(D(D(D(x1 / x2, 2), 2), 1), 1)) == "0.0"
 
@@ -148,4 +149,82 @@ end
 
     # Test for the error when 'sinh' is not in the operator set
     @test_throws "Operator sinh not found" repr(D(sinh(x1), 1))
+end
+
+@testitem "Test higher-order derivatives of inverse functions" begin
+    using DynamicAutodiff: D
+    using SymbolicRegression: ComposableExpression, Node
+    using DynamicExpressions: OperatorEnum, AbstractExpression
+
+    # Update operators to include 'inv'
+    operators = OperatorEnum(;
+        binary_operators=(+, *, /, -), unary_operators=(inv, sin, cos)
+    )
+    variable_names = ["x1", "x2"]
+    x1 = ComposableExpression(Node(Float64; feature=1); operators, variable_names)
+
+    @test repr(D(inv(x1), 1)) == "∂inv(x1)"
+    @test D(inv(x1), 1)([2.0]) ≈ [-1.0 / 2.0^2]
+
+    @test repr(D(D(inv(x1), 1), 1)) == "∂∂inv(x1)"
+    @test D(D(inv(x1), 1), 1)([2.0]) ≈ [2.0 / 2.0^3]
+
+    @test repr(D(D(D(inv(x1), 1), 1), 1)) == "∂∂∂inv(x1)"
+    @test D(D(D(inv(x1), 1), 1), 1)([2.0]) ≈ [-6.0 / 2.0^4]
+end
+
+@testitem "Test simplification in derivatives" begin
+    using DynamicAutodiff: D
+    using SymbolicRegression: ComposableExpression, Node
+    using DynamicExpressions: OperatorEnum, AbstractExpression
+
+    # Operators with 'identity' and constants
+    operators = OperatorEnum(;
+        binary_operators=(+, *, /, -), unary_operators=(sin, cos, identity)
+    )
+    variable_names = ["x1"]
+    x1 = ComposableExpression(Node(Float64; feature=1); operators, variable_names)
+
+    # Derivative of constant times a variable
+    c = ComposableExpression(Node(Float64; val=5.0); operators, variable_names)
+    expr = c * x1
+    @test repr(D(expr, 1)) == "5.0"
+
+    # Derivative when expression has no dependence on the variable
+    expr = sin(x1)
+    @test repr(D(expr, 2)) == "0.0"
+    @test D(expr, 2)([1.0]) ≈ [0.0]
+end
+
+@testitem "Test special functions and their derivatives" begin
+    using DynamicAutodiff: D
+    import DynamicAutodiff: _zero, _one, _n_one
+    using SymbolicRegression: ComposableExpression, Node
+    using DynamicExpressions: OperatorEnum, AbstractExpression, @declare_expression_operator
+
+    @declare_expression_operator(_zero, 1)
+    @declare_expression_operator(_one, 1)
+    @declare_expression_operator(_n_one, 1)
+
+    # Update operators to include special functions
+    operators = OperatorEnum(;
+        binary_operators=(+, *, /, -), unary_operators=(identity, _zero, _one, _n_one)
+    )
+    variable_names = ["x1", "x2"]
+    x1 = ComposableExpression(Node{Float64}(; feature=1); operators, variable_names)
+    x2 = ComposableExpression(Node{Float64}(; feature=2); operators, variable_names)
+
+    # Test identity function
+    @test repr(D(identity(x1), 1)) == "1.0"
+    @test D(identity(x1), 1)([2.0], [3.0]) ≈ [1.0]
+
+    # Test _zero function
+    expr_zero = _zero(x1)
+    @test repr(D(expr_zero, 1)) == "0.0"
+    @test D(expr_zero, 1)([2.0], [3.0]) ≈ [0.0]
+
+    # # Test _one function
+    expr_one = _one(x1)
+    @test repr(D(expr_one, 1)) == "0.0"
+    @test D(expr_one, 1)([2.0], [3.0]) ≈ [0.0]
 end
