@@ -7,11 +7,7 @@ using DynamicExpressions:
     constructorof,
     DynamicExpressions as DE
 
-"""
-    EvaluatesToConstant
-
-Used to declare if an operator will always evaluate to a constant.
-"""
+# Used to declare if an operator will always evaluate to a constant.
 Base.@enum EvaluatesToConstant::UInt8 Zero One NegOne NonConstant
 
 """
