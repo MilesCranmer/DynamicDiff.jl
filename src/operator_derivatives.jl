@@ -1,5 +1,6 @@
 using Compat: Fix
 using ForwardDiff: ForwardDiff
+using DynamicExpressions: DynamicExpressions as DE
 
 """
     OperatorDerivative{F,degree,arg} <: Function
