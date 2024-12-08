@@ -21,7 +21,7 @@ end
 @testitem "Test symbolic derivatives" tags = [:part2] begin
     using DynamicAutodiff: D
     using SymbolicRegression: ComposableExpression, Node
-    using DynamicExpressions: OperatorEnum, @declare_expression_operator
+    using DynamicExpressions: OperatorEnum, @declare_expression_operator, AbstractExpression
 
     # Basic setup
     operators = OperatorEnum(; binary_operators=(+, *, /, -), unary_operators=(sin, cos))
