@@ -154,10 +154,17 @@ DE.get_op_name(::typeof(_n_sin)) = "-sin"
 DE.get_op_name(::typeof(_n_cos)) = "-cos"
 
 function DE.get_op_name(::InvMonomial{C,XNP}) where {C,XNP}
-    return join(("(x -> ", string(C), "/x^", string(XNP), ")"))
+    num_derivatives = XNP - 1
+    return join((('∂' for _ in 1:num_derivatives)..., "inv"))
 end
 function DE.get_op_name(::DivMonomial{C,XP,YNP}) where {C,XP,YNP}
-    return join(("((x, y) -> ", string(C), "x^", string(XP), "/y^", string(YNP), ")"))
+    num_x_derivatives = 1 - XP
+    num_y_derivatives = YNP - 1
+    return join((
+        ("∂₁" for _ in 1:num_x_derivatives)...,
+        ("∂₂" for _ in 1:num_y_derivatives)...,
+        "[/]",
+    ))
 end
 
 # Used to declare if an operator will always evaluate to a constant.
