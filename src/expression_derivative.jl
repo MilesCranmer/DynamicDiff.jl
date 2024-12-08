@@ -15,10 +15,19 @@ function D(ex::AbstractExpression, feature::Integer)
     metadata = DE.get_metadata(ex)
     raw_metadata = getfield(metadata, :_data)  # TODO: Upstream this so we can load this
     operators = DE.get_operators(ex)
-    mult_idx = findfirst(==(*), operators.binops)::Integer
-    plus_idx = findfirst(==(+), operators.binops)::Integer
-    nbin = length(operators.binops)
-    nuna = length(operators.unaops)
+    binops = operators.binops
+    unaops = operators.unaops
+    if !((*) in binops) || !((+) in binops)
+        throw(
+            ArgumentError(
+                "`*` or `+` operator missing from operators, so differentiation is not possible.",
+            ),
+        )
+    end
+    mult_idx = findfirst(==(*), binops)::Integer
+    plus_idx = findfirst(==(+), binops)::Integer
+    nbin = length(binops)
+    nuna = length(unaops)
     tree = DE.get_contents(ex)
     operators_with_derivatives = _make_derivative_operators(operators)
     simplifies_to = (;

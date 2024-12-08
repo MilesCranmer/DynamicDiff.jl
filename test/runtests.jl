@@ -313,3 +313,18 @@ end
     @test operator_derivative(operator_derivative(/, Val(2), Val(2)), Val(2), Val(2)) isa
         DivMonomial{2,1,3}
 end
+
+@testitem "Test differentiation error" begin
+    using DynamicAutodiff: D
+    using DynamicExpressions: OperatorEnum, Expression, AbstractExpression
+    using DynamicExpressions: Node, @declare_expression_operator
+
+    for binops in [(+,), (*,), (-, /)]
+        operators = OperatorEnum(; binary_operators=(+,), unary_operators=(sin,))
+        x1 = Expression(Node{Float64}(; feature=1); operators, variable_names=["x1"])
+        @test_throws ArgumentError D(x1, 1)
+        @test_throws "`*` or `+` operator missing from operators, so differentiation is not possible." D(
+            x1, 1
+        )
+    end
+end
