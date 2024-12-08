@@ -81,30 +81,71 @@ end
     @test repr(D(my_bin_op(x, y), 1)) == "∂₁my_bin_op(x1, x2)"
     @test repr(D(my_bin_op(x, y), 2)) == "∂₂my_bin_op(x1, x2)"
     @test repr(D(my_bin_op(x, x - y), 2)) == "∂₂my_bin_op(x1, x1 - x2) * -1.0"
+
+    operators = OperatorEnum(;
+        binary_operators=(+, *, /, -),
+        unary_operators=(sin, cos, sinh, cosh, abs, sign, -, inv),
+    )
+    x1, x2 = (
+        ComposableExpression(Node(Float64; feature=i); operators, variable_names) for
+        i in 1:2
+    )
+    # Test hyperbolic functions
+    @test repr(D(sinh(x1), 1)) == "cosh(x1)"
+    @test repr(D(cosh(x1), 1)) == "sinh(x1)"
+    @test D(sinh(x2), 1)([1.0], [2.0]) ≈ [0.0]
+    @test D(cosh(x2), 1)([1.0], [2.0]) ≈ [0.0]
+
+    # Test absolute value and sign functions
+    @test repr(D(abs(x1), 1)) == "sign(x1)"
+    @test repr(D(D(abs(x1), 1), 1)) == "0.0"
+    @test repr(D(sign(x1), 1)) == "0.0"
+    @test D(abs(x1), 1)([-2.0]) ≈ [-1.0]
+    @test D(D(abs(x1), 1), 1)([-2.0]) ≈ [0.0]
+    @test D(abs(x1), 1)([2.0]) ≈ [1.0]
+
+    # Test negation
+    @test repr(D(-x1, 1)) == "-1.0"
+    @test D(-x2, 1)([1.0], [2.0]) ≈ [0.0]
+
+    # Test inverse
+    @test repr(D(inv(x1), 1)) == "∂inv(x1)"
+    @test repr(D(D(inv(x1), 1), 1)) == "∂∂inv(x1)"
+    @test repr(D(D(D(inv(x1), 1), 1), 1)) == "∂∂∂inv(x1)"
+
+    # Test division pretty printing
+    @test repr(D(x1 / x2, 1)) == "∂₁[/](x1, x2)"
+    @test repr(D(x1 / x2, 2)) == "∂₂[/](x1, x2)"
+    @test repr(D(D(x1 / x2, 1), 2)) == "∂₁∂₂[/](x1, x2)"
+    @test repr(D(D(D(x1 / x2, 1), 2), 2)) == "∂₁∂₂∂₂[/](x1, x2)"
+    @test repr(D(D(D(x1 / x2, 2), 2), 1)) == "∂₁∂₂∂₂[/](x1, x2)"
+    @test repr(D(D(D(D(x1 / x2, 2), 2), 1), 1)) == "0.0"
+
+    @test D(x1 / x2, 1)([1.0], [2.0]) ≈ [0.5]
+    @test D(x1 / x2, 2)([1.0], [2.0]) ≈ [-0.25]
+    @test D(x1 / x2, 2)([2.0], [2.0]) ≈ [-0.5]
+    @test D(D(x1 / x2, 1), 2)([1.0], [2.0]) ≈ [-0.25]
+
+    # Test combinations
+    @test repr(D(x1 * x2 + cos(x1), 1)) == "x2 + -sin(x1)"
+    @test D(x1 * x2 + cos(x1), 1)([1.0], [2.0]) ≈ [2.0 - sin(1.0)]
+    @test repr(D(x1 / (x2 + sin(x1)), 2)) == "∂₂[/](x1, x2 + sin(x1))"
+    @test repr(D(x1 / (x2 * x2 + sin(x1)), 2)) ==
+        "∂₂[/](x1, (x2 * x2) + sin(x1)) * (x2 + x2)"
+    @test D(x1 / (x2 * x2 + sin(x1)), 2)([1.0], [2.0]) ≈
+        [-1.0 / (2.0 * 2.0 + sin(1.0))^2 * (2.0 + 2.0)]
 end
 
-## TODO: Add this back in once SR modifies `D`.
-# @testitem "Test template structure with derivatives" begin
-#     using DynamicAutodiff: D
-#     using SymbolicRegression:
-#         ComposableExpression, Node, TemplateStructure, TemplateExpression
-#     using DynamicExpressions: OperatorEnum
+@testitem "Test for missing operator error" begin
+    using DynamicAutodiff: D
+    using SymbolicRegression: ComposableExpression, Node
+    using DynamicExpressions: OperatorEnum, AbstractExpression
 
-#     # Basic setup
-#     operators = OperatorEnum(; binary_operators=(+, *, /, -), unary_operators=(sin, cos))
-#     variable_names = ["x1", "x2"]
-#     x1 = ComposableExpression(Node(Float64; feature=1); operators, variable_names)
-#     x2 = ComposableExpression(Node(Float64; feature=2); operators, variable_names)
+    # Basic setup
+    operators = OperatorEnum(; binary_operators=(+, *, /, -), unary_operators=(sin, cos))
+    variable_names = ["x1", "x2"]
+    x1 = ComposableExpression(Node(Float64; feature=1); operators, variable_names)
 
-#     # Create a structure that computes f(x1, x2) and its derivative with respect to x1
-#     structure = TemplateStructure{(:f,)}(((; f), (x1, x2)) -> f(x1, x2) + D(f, 1)(x1, x2))
-#     # We pass the functions through:
-#     @test structure.num_features == (; f=2)
-
-#     # Test with a simple function and its derivative
-#     expr = TemplateExpression((; f=x1 * sin(x2)); structure, operators, variable_names)
-
-#     # Truth: x1 * sin(x2) + sin(x2)
-#     X = randn(2, 32)
-#     @test expr(X) ≈ X[1, :] .* sin.(X[2, :]) .+ sin.(X[2, :])
-# end
+    # Test for the error when 'sinh' is not in the operator set
+    @test_throws "Operator sinh not found" repr(D(sinh(x1), 1))
+end

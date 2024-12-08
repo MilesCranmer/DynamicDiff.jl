@@ -155,7 +155,7 @@ DE.get_op_name(::typeof(_n_cos)) = "-cos"
 
 function DE.get_op_name(::InvMonomial{C,XNP}) where {C,XNP}
     num_derivatives = XNP - 1
-    return join((('∂' for _ in 1:num_derivatives)..., "inv"))
+    return join((("∂" for _ in 1:num_derivatives)..., "inv"))
 end
 function DE.get_op_name(::DivMonomial{C,XP,YNP}) where {C,XP,YNP}
     num_x_derivatives = 1 - XP
