@@ -209,10 +209,12 @@ using DispatchDoctor: @stable
     #! format: off
     # Special Cases
     ## Unary
+    _n_sin(x) = -sin(x)
+    _n_cos(x) = -cos(x)
     operator_derivative(::typeof(sin), ::Val{1}, ::Val{1}) = cos
-    operator_derivative(::typeof(cos), ::Val{1}, ::Val{1}) = (-) ∘ sin
-    operator_derivative(::typeof((-) ∘ sin), ::Val{1}, ::Val{1}) = (-) ∘ cos
-    operator_derivative(::typeof((-) ∘ cos), ::Val{1}, ::Val{1}) = sin
+    operator_derivative(::typeof(cos), ::Val{1}, ::Val{1}) = _n_sin
+    operator_derivative(::typeof(_n_sin), ::Val{1}, ::Val{1}) = _n_cos
+    operator_derivative(::typeof(_n_cos), ::Val{1}, ::Val{1}) = sin
     operator_derivative(::typeof(exp), ::Val{1}, ::Val{1}) = exp
 
     ## Binary
@@ -234,12 +236,14 @@ using DispatchDoctor: @stable
     operator_derivative(::typeof(-), ::Val{2}, ::Val{2}) = _n_one
 
     ### Multiplication
-    operator_derivative(::typeof(*), ::Val{2}, ::Val{1}) = last ∘ tuple
-    operator_derivative(::typeof(*), ::Val{2}, ::Val{2}) = first ∘ tuple
-    operator_derivative(::typeof(first ∘ tuple), ::Val{2}, ::Val{1}) = _one
-    operator_derivative(::typeof(first ∘ tuple), ::Val{2}, ::Val{2}) = _zero
-    operator_derivative(::typeof(last ∘ tuple), ::Val{2}, ::Val{1}) = _zero
-    operator_derivative(::typeof(last ∘ tuple), ::Val{2}, ::Val{2}) = _one
+    _last(x, _) = x
+    _first(_, y) = y
+    operator_derivative(::typeof(*), ::Val{2}, ::Val{1}) = _last
+    operator_derivative(::typeof(*), ::Val{2}, ::Val{2}) = _first
+    operator_derivative(::typeof(_first), ::Val{2}, ::Val{1}) = _one
+    operator_derivative(::typeof(_first), ::Val{2}, ::Val{2}) = _zero
+    operator_derivative(::typeof(_last), ::Val{2}, ::Val{1}) = _zero
+    operator_derivative(::typeof(_last), ::Val{2}, ::Val{2}) = _one
 
     ### Division
     struct DivMonomial{C,XP,YNP} <: Function end
@@ -254,10 +258,10 @@ using DispatchDoctor: @stable
         DivMonomial{-C * YNP,XP,YNP + 1}()
     #! format: on
 
-    DE.get_op_name(::typeof(first ∘ tuple)) = "first"
-    DE.get_op_name(::typeof(last ∘ tuple)) = "last"
-    DE.get_op_name(::typeof((-) ∘ sin)) = "-sin"
-    DE.get_op_name(::typeof((-) ∘ cos)) = "-cos"
+    DE.get_op_name(::typeof(_first)) = "first"
+    DE.get_op_name(::typeof(_last)) = "last"
+    DE.get_op_name(::typeof(_n_sin)) = "-sin"
+    DE.get_op_name(::typeof(_n_cos)) = "-cos"
 
     function DE.get_op_name(::DivMonomial{C,XP,YNP}) where {C,XP,YNP}
         return join(("((x, y) -> ", string(C), "x^", string(XP), "/y^", string(YNP), ")"))
