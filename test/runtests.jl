@@ -4,23 +4,23 @@ using TestItemRunner
 if get(ENV, "DA_JET_TEST", "0") == "1"
     @safetestset "Code linting (JET.jl)" begin
         using Preferences
-        set_preferences!("DynamicAutodiff", "instability_check" => "disable"; force=true)
+        set_preferences!("DynamicDiff", "instability_check" => "disable"; force=true)
         using JET
-        using DynamicAutodiff
-        JET.test_package(DynamicAutodiff; target_defined_modules=true)
+        using DynamicDiff
+        JET.test_package(DynamicDiff; target_defined_modules=true)
     end
 else
     @eval @run_package_tests verbose = true
 end
 @testitem "Code quality (Aqua.jl)" begin
-    using DynamicAutodiff
+    using DynamicDiff
     using Aqua
-    Aqua.test_all(DynamicAutodiff)
+    Aqua.test_all(DynamicDiff)
 end
 
 @testitem "Test symbolic derivatives" begin
-    using DynamicAutodiff: D, _one, _n_one
-    import DynamicAutodiff: operator_derivative
+    using DynamicDiff: D, _one, _n_one
+    import DynamicDiff: operator_derivative
     using SymbolicRegression: ComposableExpression, Node
     using DynamicExpressions: OperatorEnum, @declare_expression_operator, AbstractExpression
 
@@ -155,7 +155,7 @@ end
 end
 
 @testitem "Test for missing operator error" begin
-    using DynamicAutodiff: D
+    using DynamicDiff: D
     using SymbolicRegression: ComposableExpression, Node
     using DynamicExpressions: OperatorEnum, AbstractExpression
     using DynamicExpressions.ExpressionAlgebraModule: MissingOperatorError
@@ -170,7 +170,7 @@ end
 end
 
 @testitem "Test higher-order derivatives of inverse functions" begin
-    using DynamicAutodiff: D
+    using DynamicDiff: D
     using SymbolicRegression: ComposableExpression, Node
     using DynamicExpressions: OperatorEnum, AbstractExpression
 
@@ -192,7 +192,7 @@ end
 end
 
 @testitem "Test simplification in derivatives" begin
-    using DynamicAutodiff: D
+    using DynamicDiff: D
     using SymbolicRegression: ComposableExpression, Node
     using DynamicExpressions: OperatorEnum, AbstractExpression
 
@@ -215,8 +215,8 @@ end
 end
 
 @testitem "Test special functions and their derivatives" begin
-    using DynamicAutodiff: D
-    import DynamicAutodiff: _zero, _one, _n_one
+    using DynamicDiff: D
+    import DynamicDiff: _zero, _one, _n_one
     using SymbolicRegression: ComposableExpression, Node
     using DynamicExpressions: OperatorEnum, AbstractExpression, @declare_expression_operator
 
@@ -250,7 +250,7 @@ end
 @testitem "Test custom operators" begin
     using DynamicExpressions: OperatorEnum, Expression, AbstractExpression
     using DynamicExpressions: Node, @declare_expression_operator, get_op_name
-    using DynamicAutodiff: D
+    using DynamicDiff: D
 
     my_op(x) = x
     my_bin_op(x, y) = x + y^2
@@ -275,9 +275,9 @@ end
 
 @testitem "Missing coverage" begin
     # Due to Coverage.jl missing inlined functions, we test explicitly
-    using DynamicAutodiff: D, _classify_operator, _zero, _one, _n_one, _first
-    using DynamicAutodiff: _last, _n_sin, _n_cos, operator_derivative, DivMonomial
-    using DynamicAutodiff: Zero, One, NegOne, First, Last, NonConstant
+    using DynamicDiff: D, _classify_operator, _zero, _one, _n_one, _first
+    using DynamicDiff: _last, _n_sin, _n_cos, operator_derivative, DivMonomial
+    using DynamicDiff: Zero, One, NegOne, First, Last, NonConstant
     using DynamicExpressions: get_op_name
 
     @test _zero(1.0) == 0.0
@@ -333,7 +333,7 @@ end
 end
 
 @testitem "Test differentiation error" begin
-    using DynamicAutodiff: D
+    using DynamicDiff: D
     using DynamicExpressions: OperatorEnum, Expression, AbstractExpression
     using DynamicExpressions: Node, @declare_expression_operator
 

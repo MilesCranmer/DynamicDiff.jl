@@ -1,15 +1,15 @@
 ```@meta
-CurrentModule = DynamicAutodiff
+CurrentModule = DynamicDiff
 ```
 
-# DynamicAutodiff
+# DynamicDiff
 
-Documentation for [DynamicAutodiff](https://github.com/MilesCranmer/DynamicAutodiff.jl).
+Documentation for [DynamicDiff](https://github.com/MilesCranmer/DynamicDiff.jl).
 
 ```@index
 
 ```
 
 ```@autodocs
-Modules = [DynamicAutodiff]
+Modules = [DynamicDiff]
 ```

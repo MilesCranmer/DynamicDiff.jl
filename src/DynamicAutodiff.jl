@@ -1,4 +1,4 @@
-module DynamicAutodiff
+module DynamicDiff
 
 export D
 

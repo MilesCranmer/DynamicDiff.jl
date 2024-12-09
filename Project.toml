@@ -1,5 +1,5 @@
-name = "DynamicAutodiff"
-uuid = "f005ce80-cb30-4c44-9f1f-84970b83796a"
+name = "DynamicDiff"
+uuid = "7317a516-7a03-4707-b902-c6dba1468ba0"
 authors = ["MilesCranmer <miles.cranmer@gmail.com> and contributors"]
 version = "0.1.0"
 

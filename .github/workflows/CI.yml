@@ -94,6 +94,6 @@ jobs:
         shell: julia --project=docs --color=yes {0}
         run: |
           using Documenter: DocMeta, doctest
-          using DynamicAutodiff
-          DocMeta.setdocmeta!(DynamicAutodiff, :DocTestSetup, :(using DynamicAutodiff); recursive=true)
-          doctest(DynamicAutodiff)
+          using DynamicDiff
+          DocMeta.setdocmeta!(DynamicDiff, :DocTestSetup, :(using DynamicDiff); recursive=true)
+          doctest(DynamicDiff)

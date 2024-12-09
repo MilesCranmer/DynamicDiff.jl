@@ -1,21 +1,21 @@
 <div align="center">
 
-# DynamicAutodiff
+# DynamicDiff
 
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://MilesCranmer.github.io/DynamicAutodiff.jl/dev/)
-[![Build Status](https://github.com/MilesCranmer/DynamicAutodiff.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/MilesCranmer/DynamicAutodiff.jl/actions/workflows/CI.yml?query=branch%3Amain)
-[![Coverage](https://coveralls.io/repos/github/MilesCranmer/DynamicAutodiff.jl/badge.svg?branch=main)](https://coveralls.io/github/MilesCranmer/DynamicAutodiff.jl?branch=main)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://MilesCranmer.github.io/DynamicDiff.jl/dev/)
+[![Build Status](https://github.com/MilesCranmer/DynamicDiff.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/MilesCranmer/DynamicDiff.jl/actions/workflows/CI.yml?query=branch%3Amain)
+[![Coverage](https://coveralls.io/repos/github/MilesCranmer/DynamicDiff.jl/badge.svg?branch=main)](https://coveralls.io/github/MilesCranmer/DynamicDiff.jl?branch=main)
 
 [![DispatchDoctor](https://img.shields.io/badge/%F0%9F%A9%BA_tested_with-DispatchDoctor.jl-blue?labelColor=white)](https://github.com/MilesCranmer/DispatchDoctor.jl)
 [![Aqua](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
-DynamicAutodiff.jl provides compilation-free symbolic differentiation for dynamic expressions. Built originally for [SymbolicRegression.jl](https://github.com/MilesCranmer/SymbolicRegression.jl), it is a generic library for computing derivatives of runtime expressions.
+DynamicDiff.jl provides compilation-free symbolic differentiation for dynamic expressions. Built originally for [SymbolicRegression.jl](https://github.com/MilesCranmer/SymbolicRegression.jl), it is a generic library for computing derivatives of runtime expressions.
 
 </div>
 
 ## The Derivative Operator
 
-The core of DynamicAutodiff.jl is the `D` operator, which computes symbolic partial derivatives of any `AbstractExpression` object (from [DynamicExpressions.jl](https://github.com/SymbolicML/DynamicExpressions.jl)).
+The core of DynamicDiff.jl is the `D` operator, which computes symbolic partial derivatives of any `AbstractExpression` object (from [DynamicExpressions.jl](https://github.com/SymbolicML/DynamicExpressions.jl)).
 
 ```julia
 D(ex::AbstractExpression, feature::Integer)
@@ -32,7 +32,7 @@ Let's see an example.
 First, let's set up some variables with a given set of operators:
 
 ```julia
-using DynamicAutodiff, DynamicExpressions
+using DynamicDiff, DynamicExpressions
 
 operators = OperatorEnum(; binary_operators=(+, *, /, -), unary_operators=(sin, cos));
 variable_names = ["x1", "x2", "x3"];

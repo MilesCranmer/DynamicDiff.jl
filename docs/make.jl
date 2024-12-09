@@ -1,20 +1,18 @@
-using DynamicAutodiff
+using DynamicDiff
 using Documenter
 
-DocMeta.setdocmeta!(
-    DynamicAutodiff, :DocTestSetup, :(using DynamicAutodiff); recursive=true
-)
+DocMeta.setdocmeta!(DynamicDiff, :DocTestSetup, :(using DynamicDiff); recursive=true)
 
 makedocs(;
-    modules=[DynamicAutodiff],
+    modules=[DynamicDiff],
     authors="MilesCranmer <miles.cranmer@gmail.com> and contributors",
-    sitename="DynamicAutodiff.jl",
+    sitename="DynamicDiff.jl",
     format=Documenter.HTML(;
-        canonical="https://MilesCranmer.github.io/DynamicAutodiff.jl",
+        canonical="https://MilesCranmer.github.io/DynamicDiff.jl",
         edit_link="main",
         assets=String[],
     ),
     pages=["Home" => "index.md"],
 )
 
-deploydocs(; repo="github.com/MilesCranmer/DynamicAutodiff.jl", devbranch="main")
+deploydocs(; repo="github.com/MilesCranmer/DynamicDiff.jl", devbranch="main")
