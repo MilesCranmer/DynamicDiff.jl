@@ -2,14 +2,13 @@
 
 # DynamicDiff
 
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://MilesCranmer.github.io/DynamicDiff.jl/dev/)
-[![Build Status](https://github.com/MilesCranmer/DynamicDiff.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/MilesCranmer/DynamicDiff.jl/actions/workflows/CI.yml?query=branch%3Amain)
-[![Coverage](https://coveralls.io/repos/github/MilesCranmer/DynamicDiff.jl/badge.svg?branch=main)](https://coveralls.io/github/MilesCranmer/DynamicDiff.jl?branch=main)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://MilesCranmer.github.io/DynamicDiff.jl/dev/) [![Build Status](https://github.com/MilesCranmer/DynamicDiff.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/MilesCranmer/DynamicDiff.jl/actions/workflows/CI.yml?query=branch%3Amain) [![Coverage](https://coveralls.io/repos/github/MilesCranmer/DynamicDiff.jl/badge.svg?branch=main)](https://coveralls.io/github/MilesCranmer/DynamicDiff.jl?branch=main)
 
-[![DispatchDoctor](https://img.shields.io/badge/%F0%9F%A9%BA_tested_with-DispatchDoctor.jl-blue?labelColor=white)](https://github.com/MilesCranmer/DispatchDoctor.jl)
-[![Aqua](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
+[![DispatchDoctor](https://img.shields.io/badge/%F0%9F%A9%BA_tested_with-DispatchDoctor.jl-blue?labelColor=white)](https://github.com/MilesCranmer/DispatchDoctor.jl) [![Aqua](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
-DynamicDiff.jl provides compilation-free symbolic differentiation for dynamic expressions. Built originally for [SymbolicRegression.jl](https://github.com/MilesCranmer/SymbolicRegression.jl), it is a generic library for computing derivatives of runtime expressions.
+DynamicDiff.jl provides compilation-free symbolic differentiation for runtime-generated expressions.
+
+Built for [SymbolicRegression.jl](https://github.com/MilesCranmer/SymbolicRegression.jl), it is also a generic library for computing derivatives.
 
 </div>
 
