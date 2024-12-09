@@ -16,4 +16,5 @@ makedocs(;
     pages=["Home" => "index.md"],
 )
 
+ENV["GITHUB_REPOSITORY"] = "ai-damtp-cam-ac-uk/dynamicdiff.git"
 deploydocs(; repo="github.com/ai-damtp-cam-ac-uk/dynamicdiff.git")
