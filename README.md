@@ -13,9 +13,9 @@ DynamicDiff.jl provides compilation-free symbolic differentiation for dynamic ex
 
 </div>
 
-## The Derivative Operator
+## The Derivative Operator, `D`
 
-The core of DynamicDiff.jl is the `D` operator, which computes symbolic partial derivatives of any `AbstractExpression` object (from [DynamicExpressions.jl](https://github.com/SymbolicML/DynamicExpressions.jl)).
+This operator computes symbolic partial derivatives of any `AbstractExpression` object (from [DynamicExpressions.jl](https://github.com/SymbolicML/DynamicExpressions.jl)).
 
 ```julia
 D(ex::AbstractExpression, feature::Integer)
@@ -23,7 +23,9 @@ D(ex::AbstractExpression, feature::Integer)
 
 This works by extending the `OperatorEnum` contained within `ex` to include the additional derivative operators (one-time compilation for a given set of operators), and then manipulating the symbolic tree to reference the new operators and compute chain rule compositions.
 
-Evaluation then can simply use the efficiently vectorized `eval_tree_array` function from [DynamicExpressions.jl](https://github.com/SymbolicML/DynamicExpressions.jl).
+Evaluation then can simply call the result with standard [DynamicExpressions.jl](https://github.com/SymbolicML/DynamicExpressions.jl) syntax, which uses the fast `DynamicExpressions.eval_tree_array` function.
+
+This operator can be nested an arbitrary number of times.
 
 ## Performance
 
