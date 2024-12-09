@@ -79,7 +79,7 @@ jobs:
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DOCUMENTER_KEY: ${{ secrets.DAMTP_DEPLOY_KEY }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
         run: |
           cd docs
           julia --project=. make.jl
