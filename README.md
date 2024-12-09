@@ -73,12 +73,15 @@ julia> @btime D(g, 1) setup=(g = [x1, x2, x3][rand(1:3)] * sin([x1, x2, x3][rand
 These expressions can then be evaluated using [DynamicExpressions.jl](https://github.com/SymbolicML/DynamicExpressions.jl):
 
 ```julia
+julia> df = D(f, 1);
+
 julia> df([1.0 2.0]')
 1-element Vector{Float64}:
  0.9974949866040544
 ```
 
-Again, this is very fast. Let's see 32 batches at once:
+This is also very fast. Let's take the symbolic
+derivative of an expression and then evaluate it on 32 batches:
 
 ```julia
 julia> @btime D($f, 1)(x) setup=(x = randn(2, 32));
