@@ -15,28 +15,9 @@ function D(ex::AbstractExpression, feature::Integer)
     metadata = DE.get_metadata(ex)
     raw_metadata = getfield(metadata, :_data)  # TODO: Upstream this so we can load this
     operators = DE.get_operators(ex)
-    binops = operators.binops
-    unaops = operators.unaops
-    if !((*) in binops) || !((+) in binops)
-        throw(
-            ArgumentError(
-                "`*` or `+` operator missing from operators, so differentiation is not possible.",
-            ),
-        )
-    end
-    mult_idx = findfirst(==(*), binops)::Integer
-    plus_idx = findfirst(==(+), binops)::Integer
-    nbin = length(binops)
-    nuna = length(unaops)
     tree = DE.get_contents(ex)
     operators_with_derivatives = _make_derivative_operators(operators)
-    simplifies_to = (;
-        unaops=map(_classify_operator, operators_with_derivatives.unaops),
-        binops=map(_classify_operator, operators_with_derivatives.binops),
-    )
-    ctx = SymbolicDerivativeContext(;
-        feature, plus_idx, mult_idx, nbin, nuna, simplifies_to
-    )
+    ctx = _make_context(operators, operators_with_derivatives, feature)
     d_tree = _symbolic_derivative(tree, ctx)
     return DE.with_metadata(
         DE.with_contents(ex, d_tree); raw_metadata..., operators=operators_with_derivatives
@@ -51,6 +32,42 @@ Base.@kwdef struct SymbolicDerivativeContext{TUP}
     nbin::Int
     nuna::Int
     simplifies_to::TUP
+end
+
+function _make_context(
+    operators::OperatorEnum, operators_with_derivatives::OperatorEnum, feature::Integer
+)
+    binops = operators.binops
+    unaops = operators.unaops
+    if !_has_operator(*, binops) || !_has_operator(+, binops)
+        throw(
+            ArgumentError(
+                "`*` or `+` operator missing from operators, so differentiation is not possible.",
+            ),
+        )
+    end
+    nbin = length(binops)
+    nuna = length(unaops)
+    mult_idx = _get_index(*, binops)
+    plus_idx = _get_index(+, binops)
+    simplifies_to = (;
+        unaops=_classify_all_operators(operators_with_derivatives.unaops),
+        binops=_classify_all_operators(operators_with_derivatives.binops),
+    )
+    return SymbolicDerivativeContext(;
+        feature, plus_idx, mult_idx, nbin, nuna, simplifies_to
+    )
+end
+
+# These functions ensure compiler inference of the types, even for large tuples
+@generated function _classify_all_operators(ops::Tuple{Vararg{<:Any,N}}) where {N}
+    return :(Base.Cartesian.@ntuple($N, i -> _classify_operator(ops[i])))
+end
+@generated function _has_operator(op::F, ops::Tuple{Vararg{<:Any,N}}) where {F,N}
+    return :(Base.Cartesian.@nany($N, i -> ops[i] == op))
+end
+@generated function _get_index(op::F, ops::Tuple{Vararg{<:Any,N}}) where {F,N}
+    return :(Base.Cartesian.@nif($N, i -> ops[i] == op, i -> i))
 end
 
 function _symbolic_derivative(
