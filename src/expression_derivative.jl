@@ -60,13 +60,13 @@ function _make_context(
 end
 
 # These functions ensure compiler inference of the types, even for large tuples
-@generated function _classify_all_operators(ops::Tuple{Vararg{<:Any,N}}) where {N}
+@generated function _classify_all_operators(ops::Tuple{Vararg{Any,N}}) where {N}
     return :(Base.Cartesian.@ntuple($N, i -> _classify_operator(ops[i])))
 end
-@generated function _has_operator(op::F, ops::Tuple{Vararg{<:Any,N}}) where {F,N}
+@generated function _has_operator(op::F, ops::Tuple{Vararg{Any,N}}) where {F,N}
     return :(Base.Cartesian.@nany($N, i -> ops[i] == op))
 end
-@generated function _get_index(op::F, ops::Tuple{Vararg{<:Any,N}}) where {F,N}
+@generated function _get_index(op::F, ops::Tuple{Vararg{Any,N}}) where {F,N}
     return :(Base.Cartesian.@nif($N, i -> ops[i] == op, i -> i))
 end
 
