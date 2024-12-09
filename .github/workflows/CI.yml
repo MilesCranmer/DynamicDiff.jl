@@ -79,7 +79,8 @@ jobs:
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DOCUMENTER_KEY_CAM: ${{ secrets.DAMTP_DEPLOY_KEY }}
+          GITHUB_REPOSITORY: "ai-damtp-cam-ac-uk/dynamicdiff.git"
+          DOCUMENTER_KEY: ${{ secrets.DAMTP_DEPLOY_KEY }}
         run: |
           cd docs
           julia --project=. make.jl

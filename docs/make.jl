@@ -16,9 +16,4 @@ makedocs(;
     pages=["Home" => "index.md"],
 )
 
-deploydocs(; repo="github.com/MilesCranmer/DynamicDiff.jl.git")
-
-# Mirror to DAMTP
-ENV["DOCUMENTER_KEY"] = ENV["DOCUMENTER_KEY_CAM"]
-ENV["GITHUB_REPOSITORY"] = "ai-damtp-cam-ac-uk/dynamicdiff.git"
 deploydocs(; repo="github.com/ai-damtp-cam-ac-uk/dynamicdiff.git")
