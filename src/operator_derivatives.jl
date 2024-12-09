@@ -3,6 +3,20 @@ using ForwardDiff: ForwardDiff
 using DynamicExpressions: DynamicExpressions as DE
 
 """
+    operator_derivative(op::F, ::Val{degree}, ::Val{arg}) where {F,degree,arg}
+
+Create a partial derivative operator of a given function `op` with respect to argument `arg`.
+
+# Arguments
+- `op`: The operator to differentiate
+- `degree`: The arity of the operator (1 for unary, 2 for binary)
+- `arg`: Which argument to take the derivative with respect to
+"""
+function operator_derivative(op::F, ::Val{degree}, ::Val{arg}) where {F,degree,arg}
+    return OperatorDerivative{F,degree,arg}(op)
+end
+
+"""
     OperatorDerivative{F,degree,arg} <: Function
 
 A callable type representing the partial derivative of an operator.
@@ -19,21 +33,6 @@ a scalar.
 """
 struct OperatorDerivative{F,degree,arg} <: Function
     op::F
-end
-
-"""
-    operator_derivative(op::F, ::Val{degree}, ::Val{arg}) where {F,degree,arg}
-
-Create an `OperatorDerivative` instance holding the partial derivative of the given operator
-for the given argument.
-
-# Arguments
-- `op`: The operator to differentiate
-- `degree`: The arity of the operator (1 for unary, 2 for binary)
-- `arg`: Which argument to take the derivative with respect to
-"""
-function operator_derivative(op::F, ::Val{degree}, ::Val{arg}) where {F,degree,arg}
-    return OperatorDerivative{F,degree,arg}(op)
 end
 
 function Base.show(io::IO, g::OperatorDerivative{F,degree,arg}) where {F,degree,arg}
