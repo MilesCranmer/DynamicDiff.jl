@@ -6,6 +6,7 @@ DocMeta.setdocmeta!(DynamicDiff, :DocTestSetup, :(using DynamicDiff); recursive=
 makedocs(;
     modules=[DynamicDiff],
     authors="MilesCranmer <miles.cranmer@gmail.com> and contributors",
+    clean=true,
     sitename="DynamicDiff.jl",
     format=Documenter.HTML(;
         canonical="https://ai.damtp.cam.ac.uk/dynamicdiff/stable",
@@ -15,7 +16,7 @@ makedocs(;
     pages=["Home" => "index.md"],
 )
 
-deploydocs(; repo="github.com/MilesCranmer/DynamicDiff.jl")
+deploydocs(; repo="github.com/MilesCranmer/DynamicDiff.jl.git")
 
 # Mirror to DAMTP
 ENV["DOCUMENTER_KEY"] = ENV["DOCUMENTER_KEY_CAM"]
