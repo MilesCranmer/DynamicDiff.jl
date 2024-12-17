@@ -1,6 +1,6 @@
 <div align="center">
 
-# DynamicDiff
+<img src="logo.png" width="300" alt="logo">
 
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://ai.damtp.cam.ac.uk/dynamicdiff/dev/) [![Build Status](https://github.com/MilesCranmer/DynamicDiff.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/MilesCranmer/DynamicDiff.jl/actions/workflows/CI.yml?query=branch%3Amain) [![Coverage](https://coveralls.io/repos/github/MilesCranmer/DynamicDiff.jl/badge.svg?branch=main)](https://coveralls.io/github/MilesCranmer/DynamicDiff.jl?branch=main)
 
