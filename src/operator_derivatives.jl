@@ -1,6 +1,7 @@
 using Compat: Fix
 using ForwardDiff: ForwardDiff
 using DynamicExpressions: DynamicExpressions as DE
+using .UtilsModule: subscriptify, FixExcept
 
 """
     operator_derivative(op::F, ::Val{degree}, ::Val{arg}) where {F,degree,arg}
@@ -9,7 +10,7 @@ Create a partial derivative operator of a given function `op` with respect to ar
 
 # Arguments
 - `op`: The operator to differentiate
-- `degree`: The arity of the operator (1 for unary, 2 for binary)
+- `degree`: The arity of the operator (1 for unary, 2 for binary, etc.)
 - `arg`: Which argument to take the derivative with respect to
 """
 function operator_derivative(op::F, ::Val{degree}, ::Val{arg}) where {F,degree,arg}
@@ -20,12 +21,11 @@ end
     OperatorDerivative{F,degree,arg} <: Function
 
 A callable type representing the partial derivative of an operator.
-Takes either one (`degree=1`) or two (`degree=2`) scalar arguments. Returns
-a scalar.
+Takes up to `degree` scalar arguments. Returns a scalar.
 
 # Parameters
 - `F`: The type of the original operator
-- `degree`: The arity of the operator (1 for unary, 2 for binary)
+- `degree`: The arity of the operator
 - `arg`: Which argument to take the derivative with respect to
 
 # Fields
@@ -37,12 +37,8 @@ end
 
 function Base.show(io::IO, g::OperatorDerivative{F,degree,arg}) where {F,degree,arg}
     print(io, "∂")
-    if degree == 2
-        if arg == 1
-            print(io, "₁")
-        elseif arg == 2
-            print(io, "₂")
-        end
+    if degree > 1
+        print(io, subscriptify(arg))
     end
     print(io, g.op)
     return nothing
@@ -53,11 +49,11 @@ Base.show(io::IO, ::MIME"text/plain", g::OperatorDerivative) = show(io, g)
 function (d::OperatorDerivative{F,1,1})(x) where {F}
     return ForwardDiff.derivative(d.op, x)
 end
-function (d::OperatorDerivative{F,2,1})(x, y) where {F}
-    return ForwardDiff.derivative(Fix{2}(d.op, y), x)
-end
-function (d::OperatorDerivative{F,2,2})(x, y) where {F}
-    return ForwardDiff.derivative(Fix{1}(d.op, x), y)
+function (d::OperatorDerivative{F,D,i})(args::Vararg{Any,D}) where {F,D,i}
+    return ForwardDiff.derivative(
+        FixExcept{i}(d.op, args[begin:(begin + (i - 2))]..., args[(begin + i):end]...),
+        args[i],
+    )
 end
 
 #! format: off

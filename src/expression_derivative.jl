@@ -25,38 +25,40 @@ function D(ex::AbstractExpression, feature::Integer)
 end
 
 # Holds metadata about the derivative computation.
-Base.@kwdef struct SymbolicDerivativeContext{TUP}
+Base.@kwdef struct SymbolicDerivativeContext{NUM_OP,SIMPLIFIES_TO}
     feature::Int
     plus_idx::Int
     mult_idx::Int
-    nbin::Int
-    nuna::Int
-    simplifies_to::TUP
+    nops::NUM_OP
+    simplifies_to::SIMPLIFIES_TO
+end
+
+function _get_ops_tuple(operators::OperatorEnum)
+    if hasfield(OperatorEnum, :unaops)
+        # Old API
+        return (operators.unaops, operators.binops)
+    else
+        return operators.ops
+    end
 end
 
 function _make_context(
     operators::OperatorEnum, operators_with_derivatives::OperatorEnum, feature::Integer
 )
-    binops = operators.binops
-    unaops = operators.unaops
-    if !_has_operator(*, binops) || !_has_operator(+, binops)
+    all_ops = _get_ops_tuple(operators)
+    all_ops_with_derivatives = _get_ops_tuple(operators_with_derivatives)
+    if length(all_ops) < 2 || !_has_operator(*, all_ops[2]) || !_has_operator(+, all_ops[2])
         throw(
             ArgumentError(
-                "`*` or `+` operator missing from operators, so differentiation is not possible.",
+                "Binary `*` or `+` operator missing from operators, so differentiation is not possible.",
             ),
         )
     end
-    nbin = length(binops)
-    nuna = length(unaops)
-    mult_idx = _get_index(*, binops)
-    plus_idx = _get_index(+, binops)
-    simplifies_to = (;
-        unaops=_classify_all_operators(operators_with_derivatives.unaops),
-        binops=_classify_all_operators(operators_with_derivatives.binops),
-    )
-    return SymbolicDerivativeContext(;
-        feature, plus_idx, mult_idx, nbin, nuna, simplifies_to
-    )
+    nops = map(length, all_ops)
+    mult_idx = _get_index(*, all_ops[2])
+    plus_idx = _get_index(+, all_ops[2])
+    simplifies_to = map(_classify_all_operators, all_ops_with_derivatives)
+    return SymbolicDerivativeContext(; feature, plus_idx, mult_idx, nops, simplifies_to)
 end
 
 # These functions ensure compiler inference of the types, even for large tuples
@@ -87,8 +89,8 @@ function _symbolic_derivative(
         return constructorof(N)(; val=one(T))
     elseif tree.degree == 1
         # f(g(x)) => f'(g(x)) * g'(x)
-        f_prime_op = tree.op + ctx.nuna
-        f_prime_simplifies_to = ctx.simplifies_to.unaops[f_prime_op]
+        f_prime_op = tree.op + ctx.nops[1]
+        f_prime_simplifies_to = ctx.simplifies_to[1][f_prime_op]
 
         ### We do some simplification based on zero/one derivatives ###
         if f_prime_simplifies_to == Zero
@@ -119,10 +121,10 @@ function _symbolic_derivative(
         end
     else  # tree.degree == 2
         # f(g(x), h(x)) => f^(1,0)(g(x), h(x)) * g'(x) + f^(0,1)(g(x), h(x)) * h'(x)
-        f_prime_left_op = tree.op + ctx.nbin
-        f_prime_right_op = tree.op + 2 * ctx.nbin
-        f_prime_left_simplifies_to = ctx.simplifies_to.binops[f_prime_left_op]
-        f_prime_right_simplifies_to = ctx.simplifies_to.binops[f_prime_right_op]
+        f_prime_left_op = tree.op + ctx.nops[2]
+        f_prime_right_op = tree.op + 2 * ctx.nops[2]
+        f_prime_left_simplifies_to = ctx.simplifies_to[2][f_prime_left_op]
+        f_prime_right_simplifies_to = ctx.simplifies_to[2][f_prime_right_op]
 
         ### We do some simplification based on zero/one derivatives ###
         first_term = if f_prime_left_simplifies_to == Zero
@@ -197,25 +199,61 @@ function _symbolic_derivative(
 end
 
 function _make_derivative_operators(operators::OperatorEnum)
-    unaops = operators.unaops
-    binops = operators.binops
-    new_unaops = ntuple(
-        i -> if i <= length(unaops)
-            unaops[i]
-        else
-            operator_derivative(unaops[i - length(unaops)], Val(1), Val(1))
-        end,
-        Val(2 * length(unaops)),
+    all_ops = _get_ops_tuple(operators)
+    return _make_operator_enum(
+        ntuple(i -> _make_derivative_operators(all_ops[i], Val(i)), Val(length(all_ops)))
     )
-    new_binops = ntuple(
-        i -> if i <= length(binops)
-            binops[i]
-        elseif i <= 2 * length(binops)
-            operator_derivative(binops[i - length(binops)], Val(2), Val(1))
-        else
-            operator_derivative(binops[i - 2 * length(binops)], Val(2), Val(2))
-        end,
-        Val(3 * length(binops)),
-    )
-    return OperatorEnum(new_binops, new_unaops)
+    # TODO: I don't think these `Val(i)` are type stable
+end
+
+function _make_operator_enum(ops)
+    if applicable(OperatorEnum, ops)
+        return OperatorEnum(ops)
+    else
+        @assert length(ops) == 2
+        unaops, binops = ops
+        return OperatorEnum(binops, unaops)  # Compat with old constructor
+    end
+end
+
+@generated function _make_derivative_operators(
+    operator_tuple::Tuple{Vararg{Any,nops}}, ::Val{degree}
+) where {nops,degree}
+    quote
+        # Essentially what this does is
+        #
+        # 1. For unary operators:
+        #      (foo, bar) -> (foo, bar, ∂foo, ∂bar)
+        # 2. For binary operators:
+        #      (foo, bar) -> (foo, bar, ∂₁foo, ∂₁bar, ∂₂foo, ∂₂bar)
+        #
+        # and so on, for any degree and any number of operators.
+        #
+        # The `@ntuple` and `@nif` calls are used to make this generic to any
+        # degree and any number of operators.
+
+        return Base.Cartesian.@ntuple(
+            $((degree + 1) * nops),
+            new_op_index -> Base.Cartesian.@nif(
+                $(degree + 1),
+                arg_index_plus_1 -> new_op_index <= arg_index_plus_1 * $nops,
+                arg_index_plus_1 -> let
+                    if arg_index_plus_1 == 1
+                        # (This is the `[foo, bar]` branch discussed above)
+                        operator_tuple[new_op_index]
+                    else
+                        # This is the `[∂₁foo, ∂₁bar]` branch. Note that `arg_index_plus_1`
+                        # is essentially used as the subscript for the derivative (plus 1)
+                        # So literally `∂₁foo` would be `arg_index_plus_1 == 2`, and
+                        # `operator_tuple[new_op_index - (arg_index_plus_1 - 1) * $nops] == foo`
+                        operator_derivative(
+                            operator_tuple[new_op_index - (arg_index_plus_1 - 1) * $nops],
+                            Val($degree),
+                            Val(arg_index_plus_1 - 1),
+                        )
+                    end
+                end
+            )
+        )
+    end
 end
