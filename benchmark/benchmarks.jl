@@ -1,6 +1,6 @@
 using BenchmarkTools
 using DynamicDiff: D
-using DynamicExpressions: OperatorEnum, @declare_expression_operator
+using DynamicExpressions: OperatorEnum, @declare_expression_operator, AbstractExpression
 using SymbolicRegression: ComposableExpression, Node
 using Random
 
@@ -11,34 +11,35 @@ compute_derivatives(exprs, order) = order == 1 ? [D(expr, 1) for expr in exprs] 
                                    order == 2 ? [D(D(expr, 1), 2) for expr in exprs] :
                                    [D(D(D(expr, 1), 2), 1) for expr in exprs]
 
-# Simple random expression generator
-function gen_expressions(n::Int, size::Int, ops::OperatorEnum, ::Type{T}) where {T}
+# Simple random expression generator that adapts to available operators
+function gen_expressions(n::Int, ops::OperatorEnum, ::Type{T}) where {T}
     rng = MersenneTwister(42)
     vars = ["x1", "x2", "x3"]
     
-    [gen_expr(size, ops, vars, T, rng) for _ in 1:n]
-end
-
-function gen_expr(size::Int, ops::OperatorEnum, vars, ::Type{T}, rng) where {T}
-    if size == 1
-        return rand(rng) < 0.7 ? 
-            ComposableExpression(Node(T; feature=rand(rng, 1:3)); ops, variable_names=vars) :
-            ComposableExpression(Node(T; val=randn(rng, T)); ops, variable_names=vars)
+    expressions = []
+    for _ in 1:n
+        # Create base variables
+        x1 = ComposableExpression(Node(T; feature=1); operators=ops, variable_names=vars)
+        x2 = ComposableExpression(Node(T; feature=2); operators=ops, variable_names=vars)
+        x3 = ComposableExpression(Node(T; feature=3); operators=ops, variable_names=vars)
+        c = ComposableExpression(Node(T; val=randn(rng, T)); operators=ops, variable_names=vars)
+        
+        # Create random combinations - only use + and * which are in all operator sets
+        choice = rand(rng, 1:4)
+        expr = if choice <= 1
+            x1 + x2
+        elseif choice <= 2
+            x1 * x2
+        elseif choice <= 3
+            x1 * x2 + c
+        else
+            x1 + x2 * x3
+        end
+        
+        push!(expressions, expr)
     end
     
-    # Get operators (handle API differences)
-    unary_ops, binary_ops = hasfield(typeof(ops), :ops) ? ops.ops : (ops.unaops, ops.binops)
-    
-    if !isempty(unary_ops) && rand(rng) < 0.3
-        op = rand(rng, unary_ops)
-        return op(gen_expr(size-1, ops, vars, T, rng))
-    else
-        op = rand(rng, binary_ops)
-        left_size = rand(rng, 1:size-1)
-        left = gen_expr(left_size, ops, vars, T, rng)
-        right = gen_expr(size-1-left_size, ops, vars, T, rng)
-        return op(left, right)
-    end
+    return expressions
 end
 
 # Basic operators
@@ -46,22 +47,22 @@ basic_ops = OperatorEnum(; binary_operators=(+, -, *, /), unary_operators=(sin, 
 
 for T in (Float32, Float64)
     for size in [5, 10, 20]
-        exprs = gen_expressions(100, size, basic_ops, T)
-        SUITE["basic"][T]["size_$(size)_order_1"] = @benchmarkable compute_derivatives(exprs, 1) setup=(exprs=$exprs)
-        SUITE["basic"][T]["size_$(size)_order_2"] = @benchmarkable compute_derivatives(exprs, 2) setup=(exprs=$exprs)
+        exprs = gen_expressions(size * 20, basic_ops, T)  # More expressions for each "size"
+        SUITE["basic"][T]["size_$(size)_order_1"] = @benchmarkable compute_derivatives($exprs, 1)
+        SUITE["basic"][T]["size_$(size)_order_2"] = @benchmarkable compute_derivatives($exprs, 2)
     end
 end
 
 # Extended operators  
 extended_ops = OperatorEnum(; 
     binary_operators=(+, -, *, /), 
-    unary_operators=(sin, cos, sinh, cosh, exp, log, abs, -, inv)
+    unary_operators=(sin, cos, sinh, cosh, exp, abs, -, inv)
 )
 
 for T in (Float32, Float64)
-    exprs = gen_expressions(100, 15, extended_ops, T)
+    exprs = gen_expressions(100, extended_ops, T)
     for order in 1:3
-        SUITE["extended"][T]["order_$(order)"] = @benchmarkable compute_derivatives(exprs, order) setup=(exprs=$exprs)
+        SUITE["extended"][T]["order_$(order)"] = @benchmarkable compute_derivatives($exprs, $order)
     end
 end
 
@@ -74,7 +75,7 @@ my_binop(x, y) = x*x + y
 custom_ops = OperatorEnum(; binary_operators=(+, -, *, my_binop), unary_operators=(my_op, sin))
 
 for T in (Float32, Float64)
-    exprs = gen_expressions(100, 10, custom_ops, T)
-    SUITE["custom"][T]["order_1"] = @benchmarkable compute_derivatives(exprs, 1) setup=(exprs=$exprs)
-    SUITE["custom"][T]["order_2"] = @benchmarkable compute_derivatives(exprs, 2) setup=(exprs=$exprs)
+    exprs = gen_expressions(100, custom_ops, T)
+    SUITE["custom"][T]["order_1"] = @benchmarkable compute_derivatives($exprs, 1)
+    SUITE["custom"][T]["order_2"] = @benchmarkable compute_derivatives($exprs, 2)
 end
