@@ -381,9 +381,9 @@ end
     @test repr(D(expr, 3)) == "∂₃my_fma(foo, bar, baz)"
 
     # Numerical evaluation at (1,2,3): my_fma(x,y,z)=x*y+z
-    @test D(expr, 1)([1.0 2.0 3.0]') ≈ [2.0]    # ∂/∂x = y
-    @test D(expr, 2)([1.0 2.0 3.0]') ≈ [1.0]    # ∂/∂y = x
-    @test D(expr, 3)([1.0 2.0 3.0]') ≈ [1.0]    # ∂/∂z = 1
+    @test D(expr, 1)([1.0], [2.0], [3.0]) ≈ [2.0]    # ∂/∂x = y
+    @test D(expr, 2)([1.0], [2.0], [3.0]) ≈ [1.0]    # ∂/∂y = x
+    @test D(expr, 3)([1.0], [2.0], [3.0]) ≈ [1.0]    # ∂/∂z = 1
 
     ##### Higher-order derivative check #####
     # Build a slightly more complex expression that should simplify nicely
@@ -393,12 +393,12 @@ end
     @test repr(D(expr2, 1)) == "bar + 1.0"
     # Mixed second derivative: ∂/∂bar ( ∂expr2/∂foo ) = 1.0
     @test repr(D(D(expr2, 1), 2)) == "1.0"
-    @test D(D(expr2, 1), 2)([1.0 2.0 3.0]') ≈ [1.0]
+    @test D(D(expr2, 1), 2)([1.0], [2.0], [3.0]) ≈ [1.0]
 
     ##### Nesting my_fma inside other operators #####
     expr3 = foo * my_fma(foo, bar, baz) - baz  # includes * and - operators
     # Numerical derivative wrt foo at (1,2,3): 2*foo*bar + baz with foo=1,bar=2,baz=3 => 2*1*2+3=7
-    @test D(expr3, 1)([1.0 2.0 3.0]') ≈ [7.0]
+    @test D(expr3, 1)([1.0], [2.0], [3.0]) ≈ [7.0]
 end
 
 @testitem "Test quaternary (4-arity) nodes and operators" begin
@@ -432,17 +432,17 @@ end
 
     # Numeric check at (1,2,3,4)
     # my_sumprod = 1*2 + 3*4 = 14; partials should be (b, a, d, c) => (2,1,4,3)
-    @test D(expr, 1)([1.0 2.0 3.0 4.0]') ≈ [2.0]
-    @test D(expr, 2)([1.0 2.0 3.0 4.0]') ≈ [1.0]
-    @test D(expr, 3)([1.0 2.0 3.0 4.0]') ≈ [4.0]
-    @test D(expr, 4)([1.0 2.0 3.0 4.0]') ≈ [3.0]
+    @test D(expr, 1)([1.0], [2.0], [3.0], [4.0]) ≈ [2.0]
+    @test D(expr, 2)([1.0], [2.0], [3.0], [4.0]) ≈ [1.0]
+    @test D(expr, 3)([1.0], [2.0], [3.0], [4.0]) ≈ [4.0]
+    @test D(expr, 4)([1.0], [2.0], [3.0], [4.0]) ≈ [3.0]
 
     # Mixed second derivative should be zero
     @test repr(D(D(expr, 1), 3)) == "0.0"
-    @test D(D(expr, 1), 3)([1.0 2.0 3.0 4.0]') ≈ [0.0]
+    @test D(D(expr, 1), 3)([1.0], [2.0], [3.0], [4.0]) ≈ [0.0]
 
     # Nested expression with simplification
     expr2 = expr + v1  # v1*v2 + v3*v4 + v1
     @test repr(D(expr2, 1)) == "v2 + 1.0"
-    @test D(expr2, 1)([1.0 2.0 3.0 4.0]') ≈ [3.0]  # 2 + 1
+    @test D(expr2, 1)([1.0], [2.0], [3.0], [4.0]) ≈ [3.0]  # 2 + 1
 end
