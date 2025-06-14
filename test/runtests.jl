@@ -349,10 +349,10 @@ end
 
 @testitem "Test ternary (3-arity) nodes and operators" begin
     using DynamicDiff: D
-    using SymbolicRegression: ComposableExpression, Node
     using DynamicExpressions:
         OperatorEnum,
-        AbstractExpression,
+        Expression,
+        Node,
         @declare_expression_operator
 
     # Define a simple ternary operator and declare it
@@ -366,21 +366,37 @@ end
         1 => (sin, cos),
     )
 
-    # Three symbolic variables, using Node{Float64,3} so the tree supports degree 3
-    variable_names = ["x1", "x2", "x3"]
-    x1, x2, x3 = (
-        ComposableExpression(Node{Float64,3}(; feature=i); operators, variable_names) for i in 1:3
+    # Three symbolic variables with non-default names to sanity-check printing
+    variable_names = ["foo", "bar", "baz"]
+    foo, bar, baz = (
+        Expression(Node{Float64,3}(; feature=i); operators, variable_names) for i in 1:3
     )
 
-    expr = my_fma(x1, x2, x3)
+    # Base expression
+    expr = my_fma(foo, bar, baz)
 
-    # Check pretty-printing of first-order derivatives
-    @test repr(D(expr, 1)) == "∂₁my_fma(x1, x2, x3)"
-    @test repr(D(expr, 2)) == "∂₂my_fma(x1, x2, x3)"
-    @test repr(D(expr, 3)) == "∂₃my_fma(x1, x2, x3)"
+    # Check pretty-printing of first-order partials
+    @test repr(D(expr, 1)) == "∂₁my_fma(foo, bar, baz)"
+    @test repr(D(expr, 2)) == "∂₂my_fma(foo, bar, baz)"
+    @test repr(D(expr, 3)) == "∂₃my_fma(foo, bar, baz)"
 
-    # Numerical evaluation: my_fma(x, y, z) = x*y + z
-    @test D(expr, 1)([1.0], [2.0], [3.0]) ≈ [2.0]   # ∂/∂x = y
-    @test D(expr, 2)([1.0], [2.0], [3.0]) ≈ [1.0]   # ∂/∂y = x
-    @test D(expr, 3)([1.0], [2.0], [3.0]) ≈ [1.0]   # ∂/∂z = 1
+    # Numerical evaluation at (1,2,3): my_fma(x,y,z)=x*y+z
+    @test D(expr, 1)([1.0 2.0 3.0]') ≈ [2.0]    # ∂/∂x = y
+    @test D(expr, 2)([1.0 2.0 3.0]') ≈ [1.0]    # ∂/∂y = x
+    @test D(expr, 3)([1.0 2.0 3.0]') ≈ [1.0]    # ∂/∂z = 1
+
+    ##### Higher-order derivative check #####
+    # Build a slightly more complex expression that should simplify nicely
+    expr2 = expr + foo  # => foo*bar + baz + foo
+
+    # First derivative w.r.t foo should simplify to `bar + 1.0`
+    @test repr(D(expr2, 1)) == "bar + 1.0"
+    # Mixed second derivative: ∂/∂bar ( ∂expr2/∂foo ) = 1.0
+    @test repr(D(D(expr2, 1), 2)) == "1.0"
+    @test D(D(expr2, 1), 2)([1.0 2.0 3.0]') ≈ [1.0]
+
+    ##### Nesting my_fma inside other operators #####
+    expr3 = foo * my_fma(foo, bar, baz) - baz  # includes * and - operators
+    # Numerical derivative wrt foo at (1,2,3): 2*foo*bar + baz with foo=1,bar=2,baz=3 => 2*1*2+3=7
+    @test D(expr3, 1)([1.0 2.0 3.0]') ≈ [7.0]
 end
