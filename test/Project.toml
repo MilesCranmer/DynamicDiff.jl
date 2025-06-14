@@ -10,6 +10,7 @@ TestItems = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
 
 [preferences.DynamicDiff]
 dispatch_doctor_mode = "error"
+dispatch_doctor_codegen_level = "min"
 
 [preferences.DynamicExpressions]
 dispatch_doctor_mode = "error"
