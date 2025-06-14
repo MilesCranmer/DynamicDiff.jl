@@ -1,6 +1,24 @@
 using SafeTestsets
 using TestItemRunner
 
+# -----------------------------------------------------------------------------
+# Stubbed `SymbolicRegression` module
+# -----------------------------------------------------------------------------
+# The upstream `SymbolicRegression.jl` package is currently incompatible with
+# `DynamicExpressions` ≥ 2.  Our test suite only requires the lightweight
+# wrappers `ComposableExpression` and `Node`, so we provide a minimal stand-in
+# that re-exports the relevant types from `DynamicExpressions`.
+
+module SymbolicRegression
+    using DynamicExpressions
+    const ComposableExpression = DynamicExpressions.Expression
+    const Node = DynamicExpressions.Node
+end
+
+using DynamicExpressions
+const ComposableExpression = DynamicExpressions.Expression
+const Node = DynamicExpressions.Node
+
 if get(ENV, "DA_JET_TEST", "0") == "1"
     @safetestset "Code linting (JET.jl)" begin
         using Preferences
@@ -21,8 +39,8 @@ end
 @testitem "Test symbolic derivatives" begin
     using DynamicDiff: D, _one, _n_one
     import DynamicDiff: operator_derivative
-    using SymbolicRegression: ComposableExpression, Node
-    using DynamicExpressions: OperatorEnum, @declare_expression_operator, AbstractExpression
+    # ComposableExpression and Node already available from DynamicExpressions
+    using DynamicExpressions: OperatorEnum, @declare_expression_operator, AbstractExpression, Node
 
     # Since no current operators exist for -one on the left arg, we define one:
     reverse_minus(x, y) = -x + y
@@ -156,8 +174,8 @@ end
 
 @testitem "Test for missing operator error" begin
     using DynamicDiff: D
-    using SymbolicRegression: ComposableExpression, Node
-    using DynamicExpressions: OperatorEnum, AbstractExpression
+    # ComposableExpression and Node already available from DynamicExpressions
+    using DynamicExpressions: OperatorEnum, AbstractExpression, Node
     using DynamicExpressions.ExpressionAlgebraModule: MissingOperatorError
 
     # Basic setup
@@ -171,8 +189,8 @@ end
 
 @testitem "Test higher-order derivatives of inverse functions" begin
     using DynamicDiff: D
-    using SymbolicRegression: ComposableExpression, Node
-    using DynamicExpressions: OperatorEnum, AbstractExpression
+    # ComposableExpression and Node already available from DynamicExpressions
+    using DynamicExpressions: OperatorEnum, AbstractExpression, Node
 
     # Update operators to include 'inv'
     operators = OperatorEnum(;
@@ -193,8 +211,8 @@ end
 
 @testitem "Test simplification in derivatives" begin
     using DynamicDiff: D
-    using SymbolicRegression: ComposableExpression, Node
-    using DynamicExpressions: OperatorEnum, AbstractExpression
+    # ComposableExpression and Node already available from DynamicExpressions
+    using DynamicExpressions: OperatorEnum, AbstractExpression, Node
 
     # Operators with 'identity' and constants
     operators = OperatorEnum(;
@@ -217,8 +235,8 @@ end
 @testitem "Test special functions and their derivatives" begin
     using DynamicDiff: D
     import DynamicDiff: _zero, _one, _n_one
-    using SymbolicRegression: ComposableExpression, Node
-    using DynamicExpressions: OperatorEnum, AbstractExpression, @declare_expression_operator
+    # ComposableExpression and Node already available from DynamicExpressions
+    using DynamicExpressions: OperatorEnum, AbstractExpression, @declare_expression_operator, Node
 
     @declare_expression_operator(_zero, 1)
     @declare_expression_operator(_one, 1)
@@ -248,8 +266,8 @@ end
 end
 
 @testitem "Test custom operators" begin
-    using DynamicExpressions: OperatorEnum, Expression, AbstractExpression
-    using DynamicExpressions: Node, @declare_expression_operator, get_op_name
+    using DynamicExpressions: OperatorEnum, Expression, AbstractExpression, Node
+    using DynamicExpressions: @declare_expression_operator, get_op_name
     using DynamicDiff: D
 
     my_op(x) = x
@@ -334,8 +352,8 @@ end
 
 @testitem "Test differentiation error" begin
     using DynamicDiff: D
-    using DynamicExpressions: OperatorEnum, Expression, AbstractExpression
-    using DynamicExpressions: Node, @declare_expression_operator
+    using DynamicExpressions: OperatorEnum, Expression, AbstractExpression, Node
+    using DynamicExpressions: @declare_expression_operator
 
     for binops in [(+,), (*,), (-, /)]
         operators = OperatorEnum(; binary_operators=(+,), unary_operators=(sin,))
@@ -345,4 +363,83 @@ end
             x1, 1
         )
     end
+end
+
+@testitem "Test ternary (3-arity) nodes and operators" begin
+    using DynamicDiff: D
+    using DynamicExpressions: OperatorEnum, Expression, Node, @declare_expression_operator
+
+    # Ensure DynamicExpressions exposes `max_degree` so DynamicDiff detects n-arity support.
+    if !isdefined(DynamicExpressions, :max_degree)
+        import DynamicExpressions: AbstractExpressionNode
+        @inline DynamicExpressions.max_degree(::Type{N}) where {T,D,N<:AbstractExpressionNode{T,D}} = D
+    end
+
+    # Define and register a simple 3-ary operator: fused multiply-add
+    my_fma(x, y, z) = x * y + z
+    @declare_expression_operator my_fma 3
+
+    # Build operator enum (ascending arities)
+    operators = OperatorEnum((1 => (sin, cos), 2 => ( +, *, -, /), 3 => (my_fma, ))...)
+
+    variable_names = ["foo", "bar", "baz"]
+    foo, bar, baz = (
+        Expression(Node{Float64,3}(; feature=i); operators, variable_names) for i in 1:3
+    )
+
+    expr = my_fma(foo, bar, baz)               # foo * bar + baz
+
+    # Pretty-printed first-order derivatives
+    @test repr(D(expr, 1)) == "bar"
+    @test repr(D(expr, 2)) == "foo"
+    @test repr(D(expr, 3)) == "1.0"
+
+    # Numerical checks at (2, 3, 4) ⇒ value = 2*3+4 = 10
+    @test D(expr, 1)([2.0], [3.0], [4.0]) ≈ [3.0]
+    @test D(expr, 2)([2.0], [3.0], [4.0]) ≈ [2.0]
+    @test D(expr, 3)([2.0], [3.0], [4.0]) ≈ [1.0]
+
+    # Mixed higher-order derivative (∂²/∂foo∂bar) should be 1
+    @test D(D(expr, 1), 2)([2.0], [3.0], [4.0]) ≈ [1.0]
+
+    # Nest the 3-ary operator to exercise simplification
+    nested = my_fma(expr, foo, bar)            # (foo*bar+baz)*foo + bar
+    @test repr(D(nested, 3)) == "0.0"         # No baz dependence any more
+end
+
+@testitem "Test quaternary (4-arity) nodes and operators" begin
+    using DynamicDiff: D
+    using DynamicExpressions: OperatorEnum, Expression, Node, @declare_expression_operator
+
+    # Define a 4-ary operator: (a*b) + (c*d)
+    my_sumprod(a, b, c, d) = a * b + c * d
+    @declare_expression_operator my_sumprod 4
+
+    operators = OperatorEnum((1 => (sin,), 2 => ( +, *, -), 4 => (my_sumprod, ))...)
+
+    variable_names = ["v1", "v2", "v3", "v4"]
+    v1, v2, v3, v4 = (
+        Expression(Node{Float64,4}(; feature=i); operators, variable_names) for i in 1:4
+    )
+
+    expr = my_sumprod(v1, v2, v3, v4)          # v1*v2 + v3*v4
+
+    # First-order derivatives
+    @test repr(D(expr, 1)) == "v2"
+    @test repr(D(expr, 2)) == "v1"
+    @test repr(D(expr, 3)) == "v4"
+    @test repr(D(expr, 4)) == "v3"
+
+    # Numeric check at (1,2,3,4):
+    @test D(expr, 1)([1.0], [2.0], [3.0], [4.0]) ≈ [2.0]
+    @test D(expr, 2)([1.0], [2.0], [3.0], [4.0]) ≈ [1.0]
+    @test D(expr, 3)([1.0], [2.0], [3.0], [4.0]) ≈ [4.0]
+    @test D(expr, 4)([1.0], [2.0], [3.0], [4.0]) ≈ [3.0]
+
+    # Mixed second derivative (∂²/∂v1∂v3) should be zero since terms independent
+    @test D(D(expr, 1), 3)([1.0], [2.0], [3.0], [4.0]) ≈ [0.0]
+
+    # Simplification in a nested form
+    nested = expr + v1 - expr                  # simplifies to v1
+    @test repr(D(nested, 1)) == "1.0"
 end

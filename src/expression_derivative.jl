@@ -8,6 +8,15 @@ using DispatchDoctor: @unstable
 
 const DE_2 = isdefined(DE, :max_degree)
 
+# Fallback for older `DynamicExpressions` implementations that do not provide
+# `max_degree`. This enables support for n-ary nodes without depending on a
+# specific upstream version.
+if !isdefined(DE, :max_degree)
+    @inline function DE.max_degree(::Type{N}) where {T,D,N<:AbstractExpressionNode{T,D}}
+        return D
+    end
+end
+
 """
     D(ex::AbstractExpression, feature::Integer)
 
@@ -218,7 +227,12 @@ function _make_derivative_operators(operators::OperatorEnum)
 end
 
 function _make_operator_enum(ops)
-    if DE_2 === Val(true)
+    # `DE_2` is a Boolean flag indicating whether we are working with the new
+    # DynamicExpressions ≥ 2 API (supporting arbitrary-arity nodes).  In that
+    # case, `OperatorEnum` expects a tuple of operator tuples, in ascending
+    # order of arity.  Otherwise we fall back to the legacy constructor that
+    # only handled unary/binary operators.
+    if DE_2
         return OperatorEnum(ops)
     else
         @assert length(ops) == 2
