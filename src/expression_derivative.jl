@@ -4,6 +4,7 @@ using DynamicExpressions:
     OperatorEnum,
     constructorof,
     DynamicExpressions as DE
+using DispatchDoctor: @unstable
 
 const DE_2 = isdefined(DE, :max_degree)
 
@@ -74,125 +75,122 @@ end
     return :(Base.Cartesian.@nif($N, i -> ops[i] == op, i -> i))
 end
 
-function max_degree(::Type{E}) where {E<:AbstractExpression}
-    return DE_2 ? DE.max_degree(E) : 2
+@inline @unstable function max_degree(::Type{N}) where {N<:AbstractExpressionNode}
+    return DE_2 ? DE.max_degree(N) : 2
+end
+@inline @unstable function get_child(tree::N, i::Int) where {N<:AbstractExpressionNode}
+    if DE_2
+        return DE.get_child(tree, i)
+    else
+        if i == 1
+            return tree.l
+        elseif i == 2
+            return tree.r
+        end
+    end
+end
+@inline @unstable function get_children(
+    tree::N, ::Val{d}
+) where {N<:AbstractExpressionNode,d}
+    if DE_2
+        return DE.get_children(tree, Val(d))
+    else
+        if d == 1
+            return (tree.l,)
+        elseif d == 2
+            return (tree.l, tree.r)
+        end
+    end
 end
 
 function deg1_derivative(
     tree::N, ctx::SymbolicDerivativeContext
 ) where {T,N<:AbstractExpressionNode{T}}
-    # f(g(x)) => f'(g(x)) * g'(x)
-    f_prime_op = tree.op + ctx.nops[1]
-    f_prime_simplifies_to = ctx.simplifies_to[1][f_prime_op]
-
-    ### We do some simplification based on zero/one derivatives ###
-    if f_prime_simplifies_to == Zero
-        # 0 * g' => 0
-        return constructorof(N)(; val=zero(T))
-    else
-        g_prime = _symbolic_derivative(tree.l, ctx)
-        if g_prime.degree == 0 && g_prime.constant && iszero(g_prime.val)
-            # f' * 0 => 0
-            return g_prime
-        else
-            f_prime = if f_prime_simplifies_to == NegOne
-                constructorof(N)(; val=-one(T))
-            else
-                constructorof(N)(; op=f_prime_op, l=tree.l)
-            end
-
-            if f_prime_simplifies_to == One
-                # 1 * g' => g'
-                return g_prime
-            elseif g_prime.degree == 0 && g_prime.constant && isone(g_prime.val)
-                # f' * 1 => f'
-                return f_prime
-            else
-                return constructorof(N)(; op=ctx.mult_idx, l=f_prime, r=g_prime)
-            end
-        end
-    end
+    return degn_derivative(tree, ctx, Val(1))
 end
 
 function deg2_derivative(
     tree::N, ctx::SymbolicDerivativeContext
 ) where {T,N<:AbstractExpressionNode{T}}
+    return degn_derivative(tree, ctx, Val(2))
+end
 
-    # f(g(x), h(x)) => f^(1,0)(g(x), h(x)) * g'(x) + f^(0,1)(g(x), h(x)) * h'(x)
-    f_prime_left_op = tree.op + ctx.nops[2]
-    f_prime_right_op = tree.op + 2 * ctx.nops[2]
-    f_prime_left_simplifies_to = ctx.simplifies_to[2][f_prime_left_op]
-    f_prime_right_simplifies_to = ctx.simplifies_to[2][f_prime_right_op]
+@generated function degn_derivative(
+    tree::N, ctx::SymbolicDerivativeContext, ::Val{degree}
+) where {T,N<:AbstractExpressionNode{T},degree}
+    quote
 
-    ### We do some simplification based on zero/one derivatives ###
-    first_term = if f_prime_left_simplifies_to == Zero
-        # 0 * g' => 0
-        constructorof(N)(; val=zero(T))
-    else
-        g_prime = _symbolic_derivative(tree.l, ctx)
+        # f(g(x), h(x)) => f^(1,0)(g(x), h(x)) * g'(x) + f^(0,1)(g(x), h(x)) * h'(x)
+        f_prime_op = Base.Cartesian.@ntuple($degree, i -> tree.op + i * ctx.nops[$degree])
+        f_prime_simplifies_to = Base.Cartesian.@ntuple(
+            $degree, i -> ctx.simplifies_to[$degree][f_prime_op[i]]
+        )
 
-        if f_prime_left_simplifies_to == One
-            # 1 * g' => g'
-            g_prime
-        elseif g_prime.degree == 0 && g_prime.constant && iszero(g_prime.val)
-            # f' * 0 => 0
-            g_prime
-        else
-            f_prime_left = if f_prime_left_simplifies_to == NegOne
-                constructorof(N)(; val=-one(T))
-            elseif f_prime_left_simplifies_to == First
-                tree.l
-            elseif f_prime_left_simplifies_to == Last
-                tree.r
-            else
-                constructorof(N)(; op=f_prime_left_op, l=tree.l, r=tree.r)
+        ### We do some simplification based on zero/one derivatives ###
+        terms = Base.Cartesian.@ntuple(
+            $degree,
+            i -> let
+                if f_prime_simplifies_to[i] == Zero
+                    # 0 * g' => 0
+                    constructorof(N)(; val=zero(T))
+                else
+                    g_prime = _symbolic_derivative(get_child(tree, i), ctx)
+                    if f_prime_simplifies_to[i] == One
+                        # 1 * g' => g'
+                        g_prime
+                    elseif g_prime.degree == 0 && g_prime.constant && iszero(g_prime.val)
+                        # f' * 0 => 0
+                        g_prime
+                    else
+                        f_prime = if f_prime_simplifies_to[i] == NegOne
+                            constructorof(N)(; val=-one(T))
+                        elseif f_prime_simplifies_to[i] == First
+                            get_child(tree, 1)
+                        elseif f_prime_simplifies_to[i] == Last
+                            get_child(tree, $degree)
+                        else
+                            constructorof(N)(;
+                                op=f_prime_op[i],
+                                children=get_children(tree, Val($degree)),
+                            )
+                        end
+
+                        if g_prime.degree == 0 && g_prime.constant && isone(g_prime.val)
+                            # f' * 1 => f'
+                            f_prime
+                        else
+                            # f' * g'
+                            constructorof(N)(; op=ctx.mult_idx, children=(f_prime, g_prime))
+                        end
+                    end
+                end
             end
+        )
 
-            if g_prime.degree == 0 && g_prime.constant && isone(g_prime.val)
-                # f' * 1 => f'
-                f_prime_left
-            else
-                # f' * g'
-                constructorof(N)(; op=ctx.mult_idx, l=f_prime_left, r=g_prime)
+        # Simplify if either term is zero
+        if length(terms) == 2
+            first_term = first(terms)
+            second_term = last(terms)
+            if first_term.degree == 0 && first_term.constant && iszero(first_term.val)
+                return second_term
+            elseif second_term.degree == 0 &&
+                second_term.constant &&
+                iszero(second_term.val)
+                return first_term
             end
         end
-    end
-
-    second_term = if f_prime_right_simplifies_to == Zero
-        # Simplify and just give zero
-        constructorof(N)(; val=zero(T))
-    else
-        h_prime = _symbolic_derivative(tree.r, ctx)
-        if f_prime_right_simplifies_to == One
-            h_prime
-        elseif h_prime.degree == 0 && h_prime.constant && iszero(h_prime.val)
-            h_prime
-        else
-            f_prime_right = if f_prime_right_simplifies_to == NegOne
-                constructorof(N)(; val=-one(T))
-            elseif f_prime_right_simplifies_to == First
-                tree.l
-            elseif f_prime_right_simplifies_to == Last
-                tree.r
-            else
-                constructorof(N)(; op=f_prime_right_op, l=tree.l, r=tree.r)
-            end
-            if h_prime.degree == 0 && h_prime.constant && isone(h_prime.val)
-                f_prime_right
-            else
-                constructorof(N)(; op=ctx.mult_idx, l=f_prime_right, r=h_prime)
-            end
+        # Need to stitch together the terms with the plus operator
+        if length(terms) == 1
+            return only(terms)
         end
+        return stitch_terms(terms, ctx)
     end
+end
 
-    # Simplify if either term is zero
-    if first_term.degree == 0 && first_term.constant && iszero(first_term.val)
-        return second_term
-    elseif second_term.degree == 0 && second_term.constant && iszero(second_term.val)
-        return first_term
-    else
-        return constructorof(N)(; op=ctx.plus_idx, l=first_term, r=second_term)
-    end
+function stitch_terms(
+    terms::Tuple{N,Vararg{N}}, ctx::SymbolicDerivativeContext
+) where {N<:AbstractExpressionNode}
+    return foldl((l, r) -> constructorof(N)(; op=ctx.plus_idx, children=(l, r)), terms)
 end
 
 function _symbolic_derivative(
