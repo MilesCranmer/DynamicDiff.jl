@@ -346,3 +346,41 @@ end
         )
     end
 end
+
+@testitem "Test ternary (3-arity) nodes and operators" begin
+    using DynamicDiff: D
+    using SymbolicRegression: ComposableExpression, Node
+    using DynamicExpressions:
+        OperatorEnum,
+        AbstractExpression,
+        @declare_expression_operator
+
+    # Define a simple ternary operator and declare it
+    my_fma(x, y, z) = x * y + z
+    @declare_expression_operator(my_fma, 3)
+
+    # Operator set must include + and * in the binary slot for differentiation
+    operators = OperatorEnum(
+        3 => (my_fma,),
+        2 => (+, *, /, -),
+        1 => (sin, cos),
+    )
+
+    # Three symbolic variables, using Node{Float64,3} so the tree supports degree 3
+    variable_names = ["x1", "x2", "x3"]
+    x1, x2, x3 = (
+        ComposableExpression(Node{Float64,3}(; feature=i); operators, variable_names) for i in 1:3
+    )
+
+    expr = my_fma(x1, x2, x3)
+
+    # Check pretty-printing of first-order derivatives
+    @test repr(D(expr, 1)) == "∂₁my_fma(x1, x2, x3)"
+    @test repr(D(expr, 2)) == "∂₂my_fma(x1, x2, x3)"
+    @test repr(D(expr, 3)) == "∂₃my_fma(x1, x2, x3)"
+
+    # Numerical evaluation: my_fma(x, y, z) = x*y + z
+    @test D(expr, 1)([1.0], [2.0], [3.0]) ≈ [2.0]   # ∂/∂x = y
+    @test D(expr, 2)([1.0], [2.0], [3.0]) ≈ [1.0]   # ∂/∂y = x
+    @test D(expr, 3)([1.0], [2.0], [3.0]) ≈ [1.0]   # ∂/∂z = 1
+end
