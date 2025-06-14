@@ -1,6 +1,6 @@
 # DynamicDiff.jl Benchmarks
 
-This directory contains benchmark suites for testing the performance of DynamicDiff.jl's symbolic differentiation capabilities.
+This directory contains benchmark suites for testing the performance of DynamicDiff.jl's symbolic differentiation operator `D`.
 
 ## Setup
 
@@ -27,77 +27,68 @@ results = run(SUITE)
 To run specific benchmark categories:
 
 ```julia
-# Run only first-order derivative benchmarks
-first_order_results = run(SUITE["first_order"])
+# Run basic operator benchmarks
+basic_results = run(SUITE["basic"])
 
-# Run only higher-order derivative benchmarks
-higher_order_results = run(SUITE["higher_order"])
+# Run extended operator benchmarks  
+extended_results = run(SUITE["extended"])
 
-# Run only operator-specific benchmarks
-operator_results = run(SUITE["operators"])
-
-# Run only evaluation benchmarks
-evaluation_results = run(SUITE["evaluation"])
-
-# Run only custom operator benchmarks
+# Run custom operator benchmarks
 custom_results = run(SUITE["custom"])
 ```
 
 ## Benchmark Categories
 
-### First-Order Derivatives (`SUITE["first_order"]`)
-Tests the performance of computing first-order derivatives for:
-- Simple expressions with basic operators (+, -, *, /)
-- Expressions of different sizes (5, 10, 20 nodes)
-- Both Float32 and Float64 precision
+### Basic Operators (`SUITE["basic"]`)
+Tests `D` performance with fundamental operators:
+- **Operators**: `+`, `-`, `*`, `/`, `sin`, `cos`
+- **Expression sizes**: 5, 10, 20 nodes
+- **Derivatives**: 1st and 2nd order
+- **Test cases**: 100 random expressions per configuration
+- **Types**: Float32 and Float64
 
-### Higher-Order Derivatives (`SUITE["higher_order"]`)
-Tests the performance of computing:
-- Second-order derivatives
-- Third-order derivatives  
-- Mixed partial derivatives
-
-### Operator Types (`SUITE["operators"]`)
-Tests differentiation performance for different types of operators:
-- Trigonometric functions (sin, cos)
-- Hyperbolic functions (sinh, cosh)
-- Special functions (abs, sign, inv)
-
-### Evaluation (`SUITE["evaluation"]`)
-Tests the performance of:
-- Evaluating computed derivatives
-- Combined derivative computation and evaluation
+### Extended Operators (`SUITE["extended"]`)
+Tests `D` performance with a broader operator set:
+- **Operators**: `+`, `-`, `*`, `/`, `sin`, `cos`, `sinh`, `cosh`, `exp`, `log`, `abs`, `-`, `inv`
+- **Expression size**: 15 nodes
+- **Derivatives**: 1st, 2nd, and 3rd order
+- **Test cases**: 100 random expressions per configuration
+- **Types**: Float32 and Float64
 
 ### Custom Operators (`SUITE["custom"]`)
-Tests differentiation of expressions containing user-defined operators.
+Tests `D` performance with user-defined operators:
+- **Custom operators**: `my_op(x) = 2x + 1`, `my_binop(x,y) = x² + y`
+- **Expression size**: 10 nodes
+- **Derivatives**: 1st and 2nd order
+- **Test cases**: 100 random expressions per configuration
+- **Types**: Float32 and Float64
+
+## Key Features
+
+- **Focused scope**: Only benchmarks the `D` operator itself
+- **Large test sets**: 100 expressions per benchmark (not just 3)
+- **No list comprehensions in benchmarks**: All wrapped in helper functions
+- **Random expression generation**: Diverse test cases with fixed seed for reproducibility
+- **Multiple operator sets**: Tests different complexity levels
+- **Higher-order derivatives**: Tests nested `D` operations
 
 ## Results Analysis
-
-To analyze and compare results:
 
 ```julia
 # Print median times
 BenchmarkTools.median(results)
 
-# Get memory allocation information
-BenchmarkTools.memory(results)
-
 # Compare different configurations
-judge(results_v1, results_v2)
+judge(old_results, new_results)
+
+# Memory usage
+BenchmarkTools.memory(results)
 ```
-
-## Extending the Benchmarks
-
-To add new benchmarks:
-
-1. Create a new benchmark function following the pattern of existing functions
-2. Add it to the main `SUITE` at the end of `benchmarks.jl`
-3. Document the new benchmark category in this README
 
 ## Dependencies
 
-- BenchmarkTools.jl: For benchmark infrastructure
-- DynamicDiff.jl: The package being benchmarked
-- DynamicExpressions.jl: For expression construction
-- SymbolicRegression.jl: For ComposableExpression support
-- Random.jl: For generating random test expressions
+- BenchmarkTools.jl: Benchmark infrastructure
+- DynamicDiff.jl: The package being benchmarked  
+- DynamicExpressions.jl: Expression construction
+- SymbolicRegression.jl: ComposableExpression support
+- Random.jl: Random expression generation
