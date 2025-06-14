@@ -1,7 +1,7 @@
 name = "DynamicDiff"
 uuid = "7317a516-7a03-4707-b902-c6dba1468ba0"
 authors = ["MilesCranmer <miles.cranmer@gmail.com> and contributors"]
-version = "0.2.1"
+version = "0.3.0"
 
 [deps]
 Compat = "34da2185-b29b-5c13-b0c7-acf172513d20"
