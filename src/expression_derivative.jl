@@ -103,18 +103,6 @@ end
     end
 end
 
-function deg1_derivative(
-    tree::N, ctx::SymbolicDerivativeContext
-) where {T,N<:AbstractExpressionNode{T}}
-    return degn_derivative(tree, ctx, Val(1))
-end
-
-function deg2_derivative(
-    tree::N, ctx::SymbolicDerivativeContext
-) where {T,N<:AbstractExpressionNode{T}}
-    return degn_derivative(tree, ctx, Val(2))
-end
-
 @generated function degn_derivative(
     tree::N, ctx::SymbolicDerivativeContext, ::Val{degree}
 ) where {T,N<:AbstractExpressionNode{T},degree}
@@ -133,7 +121,7 @@ end
                     # 0 * g' => 0
                     constructorof(N)(; val=zero(T))
                 else
-                    g_prime = _symbolic_derivative(get_child(tree, i), ctx)
+                    g_prime = _symbolic_derivative(get_child(tree, i), ctx)::N
                     if f_prime_simplifies_to[i] == One
                         # 1 * g' => g'
                         g_prime
@@ -208,7 +196,7 @@ function _symbolic_derivative(
     elseif tree.degree == 0 # && any_dependence
         return constructorof(N)(; val=one(T))
     else
-        return _degn_derivative_dispatch(tree, ctx)
+        return _degn_derivative_dispatch(tree, ctx)::N
     end
 end
 @generated function _degn_derivative_dispatch(
