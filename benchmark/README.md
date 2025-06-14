@@ -11,12 +11,12 @@ results = run(SUITE)
 
 ## Structure
 
-- **`basic`**: Basic operators (+, -, *, /, sin, cos) with sizes 5/10/20 nodes
-- **`extended`**: Extended operators including sinh, cosh, exp, log, abs, inv  
+- **`basic`**: Basic operators (+, -, *, /, sin, cos) with sizes 5/10/20 (100/200/400 expressions)
+- **`extended`**: Extended operators including sinh, cosh, exp, abs, inv  
 - **`custom`**: User-defined operators
 
-Each tests 100 random expressions for 1st/2nd/3rd order derivatives on Float32/Float64.
+Each tests 1st/2nd/3rd order derivatives on Float32/Float64.
 
 ## Dependencies
 
-- BenchmarkTools.jl, DynamicDiff.jl, DynamicExpressions.jl, SymbolicRegression.jl
+- BenchmarkTools.jl, DynamicDiff.jl, DynamicExpressions.jl

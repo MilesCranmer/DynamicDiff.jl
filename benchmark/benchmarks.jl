@@ -1,7 +1,6 @@
 using BenchmarkTools
 using DynamicDiff: D
-using DynamicExpressions: OperatorEnum, @declare_expression_operator, AbstractExpression
-using SymbolicRegression: ComposableExpression, Node
+using DynamicExpressions: Expression, OperatorEnum, @declare_expression_operator, AbstractExpression, Node
 using Random
 
 const SUITE = BenchmarkGroup()
@@ -19,10 +18,10 @@ function gen_expressions(n::Int, ops::OperatorEnum, ::Type{T}) where {T}
     expressions = []
     for _ in 1:n
         # Create base variables
-        x1 = ComposableExpression(Node(T; feature=1); operators=ops, variable_names=vars)
-        x2 = ComposableExpression(Node(T; feature=2); operators=ops, variable_names=vars)
-        x3 = ComposableExpression(Node(T; feature=3); operators=ops, variable_names=vars)
-        c = ComposableExpression(Node(T; val=randn(rng, T)); operators=ops, variable_names=vars)
+        x1 = Expression(Node{T}(; feature=1); operators=ops, variable_names=vars)
+        x2 = Expression(Node{T}(; feature=2); operators=ops, variable_names=vars)
+        x3 = Expression(Node{T}(; feature=3); operators=ops, variable_names=vars)
+        c = Expression(Node{T}(; val=randn(rng, T)); operators=ops, variable_names=vars)
         
         # Create random combinations - only use + and * which are in all operator sets
         choice = rand(rng, 1:4)
