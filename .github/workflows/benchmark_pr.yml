@@ -11,3 +11,4 @@ jobs:
         with:
           julia-version: "1"
           job-summary: "true"
+          bench-on: ${{ github.event.pull_request.head.sha }}
