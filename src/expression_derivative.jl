@@ -204,7 +204,9 @@ end
             if deg == 0
                 constructorof(N)(; val=one(T))
             else
-                Base.Cartesian.@nif($D, i -> i == deg, i -> degn_derivative(tree, ctx, Val(i))::N)
+                Base.Cartesian.@nif(
+                    $D, i -> i == deg, i -> degn_derivative(tree, ctx, Val(i))::N
+                )
             end
         end
         return out::N
