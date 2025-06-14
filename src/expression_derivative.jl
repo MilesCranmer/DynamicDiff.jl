@@ -220,7 +220,7 @@ function _make_derivative_operators(operators::OperatorEnum)
 end
 
 function _make_operator_enum(ops)
-    if DE_2 === Val(true)
+    if DE_2
         return OperatorEnum(ops)
     else
         @assert length(ops) == 2
