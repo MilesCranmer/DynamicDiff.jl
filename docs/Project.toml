@@ -1,2 +1,6 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+DynamicDiff = "7317a516-7a03-4707-b902-c6dba1468ba0"
+
+[sources]
+DynamicDiff = { path = "../" }

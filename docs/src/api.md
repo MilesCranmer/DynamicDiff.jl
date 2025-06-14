@@ -11,5 +11,5 @@ Documentation for [DynamicDiff](https://github.com/MilesCranmer/DynamicDiff.jl).
 ```
 
 ```@autodocs
-Modules = [DynamicDiff]
+Modules = [DynamicDiff, DynamicDiff.UtilsModule]
 ```
