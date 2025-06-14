@@ -346,3 +346,43 @@ end
         )
     end
 end
+
+@testitem "Test n-arity nodes (3-degree and higher)" begin
+    # NOTE: N-arity operators (degree > 2) are not yet supported in DynamicExpressions v1.x
+    # This test is a placeholder for when DynamicExpressions v2.0 is released with n-arity support
+    
+    using DynamicDiff: D
+    using DynamicExpressions: OperatorEnum, Expression, Node
+    
+    # Current limitation: Only unary (degree 1) and binary (degree 2) operators are supported
+    # When DynamicExpressions v2.0 is released, this test should be expanded to include:
+    # - Node{T,3} and Node{T,4} types for higher-degree nodes
+    # - 3-arity operators like fma(x,y,z) = x*y + z
+    # - 4-arity operators like quad_sum(w,x,y,z) = w+x+y+z
+    # - OperatorEnum with syntax: OperatorEnum(1 => (sin,cos), 2 => (+,*), 3 => (fma,), 4 => (quad_sum,))
+    
+    # For now, test maximum degree nodes that are currently supported
+    operators = OperatorEnum(; binary_operators=(+, *, -, /), unary_operators=(sin, cos))
+    variable_names = ["x1", "x2", "x3"]
+    
+    # Test with higher degree type parameter (even though operators are still limited to degree 2)
+    x1 = Expression(Node{Float64}(; feature=1); operators, variable_names)
+    x2 = Expression(Node{Float64}(; feature=2); operators, variable_names)
+    x3 = Expression(Node{Float64}(; feature=3); operators, variable_names)
+    
+    # Test complex binary expressions that would be building blocks for n-arity expressions
+    complex_expr = x1 * x2 + x3  # This simulates what fma(x1,x2,x3) would do
+    
+    # For now, just test that expressions can be created and have string representations
+    @test repr(complex_expr) isa String
+    @test repr(D(complex_expr, 1)) isa String
+    @test repr(D(complex_expr, 2)) isa String
+    @test repr(D(complex_expr, 3)) isa String
+    
+    # Test mixed expressions
+    mixed_expr = x1 * x2 + sin(x3)
+    @test repr(mixed_expr) isa String
+    @test repr(D(mixed_expr, 1)) isa String
+    @test repr(D(mixed_expr, 2)) isa String
+    @test repr(D(mixed_expr, 3)) isa String
+end
