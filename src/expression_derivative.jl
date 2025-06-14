@@ -180,32 +180,34 @@ function stitch_terms(
     return foldl((l, r) -> constructorof(N)(; op=ctx.plus_idx, children=(l, r)), terms)
 end
 
-function _symbolic_derivative(
-    tree::N, ctx::SymbolicDerivativeContext
-) where {T,N<:AbstractExpressionNode{T}}
-    # NOTE: We cannot mutate the tree here! Since we use it twice.
-
-    # Quick test to see if we have any dependence on the feature, so
-    # we can return 0 for the branch
-    any_dependence = any(tree) do node
-        node.degree == 0 && !node.constant && node.feature == ctx.feature
-    end
-
-    if !any_dependence
-        return constructorof(N)(; val=zero(T))
-    elseif tree.degree == 0 # && any_dependence
-        return constructorof(N)(; val=one(T))
-    else
-        return _degn_derivative_dispatch(tree, ctx)::N
+function _any_dependence(tree::AbstractExpressionNode, feature::Integer)
+    any(tree) do node
+        node.degree == 0 && !node.constant && node.feature == feature
     end
 end
-@generated function _degn_derivative_dispatch(
+
+@generated function _symbolic_derivative(
     tree::N, ctx::SymbolicDerivativeContext
-) where {N<:AbstractExpressionNode}
+) where {T,N<:AbstractExpressionNode{T}}
     D = max_degree(N)
-    return quote
+    quote
+        # NOTE: We cannot mutate the tree here! Since we use it twice.
+
+        # Quick test to see if we have any dependence on the feature, so
+        # we can return 0 for the branch
+        any_dependence = _any_dependence(tree, ctx.feature)
+
         deg = tree.degree
-        Base.Cartesian.@nif($D, i -> i == deg, i -> degn_derivative(tree, ctx, Val(i)))
+        out = if !any_dependence
+            constructorof(N)(; val=zero(T))
+        else
+            if deg == 0
+                constructorof(N)(; val=one(T))
+            else
+                Base.Cartesian.@nif($D, i -> i == deg, i -> degn_derivative(tree, ctx, Val(i))::N)
+            end
+        end
+        return out::N
     end
 end
 
