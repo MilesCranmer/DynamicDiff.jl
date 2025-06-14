@@ -21,8 +21,7 @@ end
 @testitem "Test symbolic derivatives" begin
     using DynamicDiff: D, _one, _n_one
     import DynamicDiff: operator_derivative
-    using SymbolicRegression: ComposableExpression, Node
-    using DynamicExpressions: OperatorEnum, @declare_expression_operator, AbstractExpression
+    using DynamicExpressions: Expression, Node, OperatorEnum, @declare_expression_operator, AbstractExpression
 
     # Since no current operators exist for -one on the left arg, we define one:
     reverse_minus(x, y) = -x + y
@@ -35,25 +34,25 @@ end
         binary_operators=(+, *, /, -, reverse_minus), unary_operators=(sin, cos)
     )
     variable_names = ["x1", "x2"]
-    x1 = ComposableExpression(Node(Float64; feature=1); operators, variable_names)
-    x2 = ComposableExpression(Node(Float64; feature=2); operators, variable_names)
+    x1 = Expression(Node(Float64; feature=1); operators, variable_names)
+    x2 = Expression(Node(Float64; feature=2); operators, variable_names)
 
     # Test constant derivative
-    c = ComposableExpression(Node(Float64; val=3.0); operators, variable_names)
+    c = Expression(Node(Float64; val=3.0); operators, variable_names)
     @test string(D(c, 1)) == "0.0"
-    @test D(c, 1)([1.0]) ≈ [0.0]
-    @test D(x1 + x2, 1)([0.0], [0.0]) ≈ [1.0]
-    @test D(x1 + x2 * x2, 2)([0.0], [2.0]) ≈ [4.0]
-    @test D(x1 * x2, 1)([1.0], [2.0]) ≈ [2.0]
+    @test D(c, 1)([1.0;;]) ≈ [0.0]
+    @test D(x1 + x2, 1)([0.0 0.0]') ≈ [1.0]
+    @test D(x1 + x2 * x2, 2)([0.0 2.0]') ≈ [4.0]
+    @test D(x1 * x2, 1)([1.0 2.0]') ≈ [2.0]
 
     # Test inference
     @inferred D(x1 * x2, 1)
     @inferred D(x1 * x2, 2)
 
     # Second order!
-    @test D(D(x1 * x2, 1), 2)([1.0], [2.0]) ≈ [1.0]
-    @test D(D(3.0 * x1 * x2 - x2, 1), 2)([1.0], [2.0]) ≈ [3.0]
-    @test D(D(x1 * x2, 1), 1)([1.0], [2.0]) ≈ [0.0]
+    @test D(D(x1 * x2, 1), 2)([1.0 2.0]') ≈ [1.0]
+    @test D(D(3.0 * x1 * x2 - x2, 1), 2)([1.0 2.0]') ≈ [3.0]
+    @test D(D(x1 * x2, 1), 1)([1.0 2.0]') ≈ [0.0]
 
     @test repr(D(x1 - x2, 1)) == "1.0"
     @test repr(D(x1 - x2, 2)) == "-1.0"
@@ -61,10 +60,10 @@ end
     @test repr(D(reverse_minus(x1, x2), 2)) == "1.0"
 
     # Unary operators:
-    @test D(sin(x1), 1)([1.0]) ≈ [cos(1.0)]
-    @test D(cos(x1), 1)([1.0]) ≈ [-sin(1.0)]
-    @test D(sin(x1) * cos(x2), 1)([1.0], [2.0]) ≈ [cos(1.0) * cos(2.0)]
-    @test D(D(sin(x1) * cos(x2), 1), 2)([1.0], [2.0]) ≈ [cos(1.0) * -sin(2.0)]
+    @test D(sin(x1), 1)([1.0;;]) ≈ [cos(1.0)]
+    @test D(cos(x1), 1)([1.0;;]) ≈ [-sin(1.0)]
+    @test D(sin(x1) * cos(x2), 1)([1.0 2.0]') ≈ [cos(1.0) * cos(2.0)]
+    @test D(D(sin(x1) * cos(x2), 1), 2)([1.0 2.0]') ≈ [cos(1.0) * -sin(2.0)]
 
     # Also simplifies over `*`
     @test repr(D(x1 * x2, 1)) == "x2"
@@ -89,8 +88,8 @@ end
         binary_operators=(+, -, *, /, my_bin_op), unary_operators=(my_op,)
     )
 
-    x = ComposableExpression(Node(Float64; feature=1); operators, variable_names)
-    y = ComposableExpression(Node(Float64; feature=2); operators, variable_names)
+    x = Expression(Node(Float64; feature=1); operators, variable_names)
+    y = Expression(Node(Float64; feature=2); operators, variable_names)
 
     @test repr(D(my_op(x), 1)) == "∂my_op(x1)"
     @test repr(D(D(my_op(x), 1), 1)) == "∂∂my_op(x1)"
@@ -104,26 +103,26 @@ end
         unary_operators=(sin, cos, sinh, cosh, abs, sign, -, inv),
     )
     x1, x2 = (
-        ComposableExpression(Node(Float64; feature=i); operators, variable_names) for
+        Expression(Node(Float64; feature=i); operators, variable_names) for
         i in 1:2
     )
     # Test hyperbolic functions
     @test repr(D(sinh(x1), 1)) == "cosh(x1)"
     @test repr(D(cosh(x1), 1)) == "sinh(x1)"
-    @test D(sinh(x2), 1)([1.0], [2.0]) ≈ [0.0]
-    @test D(cosh(x2), 1)([1.0], [2.0]) ≈ [0.0]
+    @test D(sinh(x2), 1)([1.0 2.0]') ≈ [0.0]
+    @test D(cosh(x2), 1)([1.0 2.0]') ≈ [0.0]
 
     # Test absolute value and sign functions
     @test repr(D(abs(x1), 1)) == "sign(x1)"
     @test repr(D(D(abs(x1), 1), 1)) == "0.0"
     @test repr(D(sign(x1), 1)) == "0.0"
-    @test D(abs(x1), 1)([-2.0]) ≈ [-1.0]
-    @test D(D(abs(x1), 1), 1)([-2.0]) ≈ [0.0]
-    @test D(abs(x1), 1)([2.0]) ≈ [1.0]
+    @test D(abs(x1), 1)([-2.0;;]) ≈ [-1.0]
+    @test D(D(abs(x1), 1), 1)([-2.0;;]) ≈ [0.0]
+    @test D(abs(x1), 1)([2.0;;]) ≈ [1.0]
 
     # Test negation
     @test repr(D(-x1, 1)) == "-1.0"
-    @test D(-x2, 1)([1.0], [2.0]) ≈ [0.0]
+    @test D(-x2, 1)([1.0 2.0]') ≈ [0.0]
 
     # Test inverse
     @test repr(D(inv(x1), 1)) == "∂inv(x1)"
@@ -139,31 +138,30 @@ end
     @test repr(D(D(D(x1 / x2, 2), 2), 1)) == "∂₁∂₂∂₂[/](x1, x2)"
     @test repr(D(D(D(D(x1 / x2, 2), 2), 1), 1)) == "0.0"
 
-    @test D(x1 / x2, 1)([1.0], [2.0]) ≈ [0.5]
-    @test D(x1 / x2, 2)([1.0], [2.0]) ≈ [-0.25]
-    @test D(x1 / x2, 2)([2.0], [2.0]) ≈ [-0.5]
-    @test D(D(x1 / x2, 1), 2)([1.0], [2.0]) ≈ [-0.25]
+    @test D(x1 / x2, 1)([1.0 2.0]') ≈ [0.5]
+    @test D(x1 / x2, 2)([1.0 2.0]') ≈ [-0.25]
+    @test D(x1 / x2, 2)([2.0 2.0]') ≈ [-0.5]
+    @test D(D(x1 / x2, 1), 2)([1.0 2.0]') ≈ [-0.25]
 
     # Test combinations
     @test repr(D(x1 * x2 + cos(x1), 1)) == "x2 + -sin(x1)"
-    @test D(x1 * x2 + cos(x1), 1)([1.0], [2.0]) ≈ [2.0 - sin(1.0)]
+    @test D(x1 * x2 + cos(x1), 1)([1.0 2.0]') ≈ [2.0 - sin(1.0)]
     @test repr(D(x1 / (x2 + sin(x1)), 2)) == "∂₂[/](x1, x2 + sin(x1))"
     @test repr(D(x1 / (x2 * x2 + sin(x1)), 2)) ==
         "∂₂[/](x1, (x2 * x2) + sin(x1)) * (x2 + x2)"
-    @test D(x1 / (x2 * x2 + sin(x1)), 2)([1.0], [2.0]) ≈
+    @test D(x1 / (x2 * x2 + sin(x1)), 2)([1.0 2.0]') ≈
         [-1.0 / (2.0 * 2.0 + sin(1.0))^2 * (2.0 + 2.0)]
 end
 
 @testitem "Test for missing operator error" begin
     using DynamicDiff: D
-    using SymbolicRegression: ComposableExpression, Node
-    using DynamicExpressions: OperatorEnum, AbstractExpression
+    using DynamicExpressions: Expression, Node, OperatorEnum, AbstractExpression
     using DynamicExpressions.ExpressionAlgebraModule: MissingOperatorError
 
     # Basic setup
     operators = OperatorEnum(; binary_operators=(+, *, /, -), unary_operators=(sin, cos))
     variable_names = ["x1", "x2"]
-    x1 = ComposableExpression(Node(Float64; feature=1); operators, variable_names)
+    x1 = Expression(Node(Float64; feature=1); operators, variable_names)
 
     # Test for the error when 'sinh' is not in the operator set
     @test_throws MissingOperatorError repr(D(sinh(x1), 1))
@@ -171,54 +169,51 @@ end
 
 @testitem "Test higher-order derivatives of inverse functions" begin
     using DynamicDiff: D
-    using SymbolicRegression: ComposableExpression, Node
-    using DynamicExpressions: OperatorEnum, AbstractExpression
+    using DynamicExpressions: Expression, Node, OperatorEnum, AbstractExpression
 
     # Update operators to include 'inv'
     operators = OperatorEnum(;
         binary_operators=(+, *, /, -), unary_operators=(inv, sin, cos)
     )
     variable_names = ["x1", "x2"]
-    x1 = ComposableExpression(Node(Float64; feature=1); operators, variable_names)
+    x1 = Expression(Node(Float64; feature=1); operators, variable_names)
 
     @test repr(D(inv(x1), 1)) == "∂inv(x1)"
-    @test D(inv(x1), 1)([2.0]) ≈ [-1.0 / 2.0^2]
+    @test D(inv(x1), 1)([2.0;;]) ≈ [-1.0 / 2.0^2]
 
     @test repr(D(D(inv(x1), 1), 1)) == "∂∂inv(x1)"
-    @test D(D(inv(x1), 1), 1)([2.0]) ≈ [2.0 / 2.0^3]
+    @test D(D(inv(x1), 1), 1)([2.0;;]) ≈ [2.0 / 2.0^3]
 
     @test repr(D(D(D(inv(x1), 1), 1), 1)) == "∂∂∂inv(x1)"
-    @test D(D(D(inv(x1), 1), 1), 1)([2.0]) ≈ [-6.0 / 2.0^4]
+    @test D(D(D(inv(x1), 1), 1), 1)([2.0;;]) ≈ [-6.0 / 2.0^4]
 end
 
 @testitem "Test simplification in derivatives" begin
     using DynamicDiff: D
-    using SymbolicRegression: ComposableExpression, Node
-    using DynamicExpressions: OperatorEnum, AbstractExpression
+    using DynamicExpressions: Expression, Node, OperatorEnum, AbstractExpression
 
     # Operators with 'identity' and constants
     operators = OperatorEnum(;
         binary_operators=(+, *, /, -), unary_operators=(sin, cos, identity)
     )
     variable_names = ["x1"]
-    x1 = ComposableExpression(Node(Float64; feature=1); operators, variable_names)
+    x1 = Expression(Node(Float64; feature=1); operators, variable_names)
 
     # Derivative of constant times a variable
-    c = ComposableExpression(Node(Float64; val=5.0); operators, variable_names)
+    c = Expression(Node(Float64; val=5.0); operators, variable_names)
     expr = c * x1
     @test repr(D(expr, 1)) == "5.0"
 
     # Derivative when expression has no dependence on the variable
     expr = sin(x1)
     @test repr(D(expr, 2)) == "0.0"
-    @test D(expr, 2)([1.0]) ≈ [0.0]
+    @test D(expr, 2)([1.0;;]) ≈ [0.0]
 end
 
 @testitem "Test special functions and their derivatives" begin
     using DynamicDiff: D
     import DynamicDiff: _zero, _one, _n_one
-    using SymbolicRegression: ComposableExpression, Node
-    using DynamicExpressions: OperatorEnum, AbstractExpression, @declare_expression_operator
+    using DynamicExpressions: Expression, Node, OperatorEnum, AbstractExpression, @declare_expression_operator
 
     @declare_expression_operator(_zero, 1)
     @declare_expression_operator(_one, 1)
@@ -229,22 +224,22 @@ end
         binary_operators=(+, *, /, -), unary_operators=(identity, _zero, _one, _n_one)
     )
     variable_names = ["x1", "x2"]
-    x1 = ComposableExpression(Node{Float64}(; feature=1); operators, variable_names)
-    x2 = ComposableExpression(Node{Float64}(; feature=2); operators, variable_names)
+    x1 = Expression(Node{Float64}(; feature=1); operators, variable_names)
+    x2 = Expression(Node{Float64}(; feature=2); operators, variable_names)
 
     # Test identity function
     @test repr(D(identity(x1), 1)) == "1.0"
-    @test D(identity(x1), 1)([2.0], [3.0]) ≈ [1.0]
+    @test D(identity(x1), 1)([2.0 3.0]') ≈ [1.0]
 
     # Test _zero function
     expr_zero = _zero(x1)
     @test repr(D(expr_zero, 1)) == "0.0"
-    @test D(expr_zero, 1)([2.0], [3.0]) ≈ [0.0]
+    @test D(expr_zero, 1)([2.0 3.0]') ≈ [0.0]
 
     # # Test _one function
     expr_one = _one(x1)
     @test repr(D(expr_one, 1)) == "0.0"
-    @test D(expr_one, 1)([2.0], [3.0]) ≈ [0.0]
+    @test D(expr_one, 1)([2.0 3.0]') ≈ [0.0]
 end
 
 @testitem "Test custom operators" begin
