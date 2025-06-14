@@ -119,8 +119,7 @@ end
     tree::N, ctx::SymbolicDerivativeContext, ::Val{degree}
 ) where {T,N<:AbstractExpressionNode{T},degree}
     quote
-
-        # f(g(x), h(x)) => f^(1,0)(g(x), h(x)) * g'(x) + f^(0,1)(g(x), h(x)) * h'(x)
+        # df/dx => ∑ᵢ (∂ᵢf)(args...) * dargs[i]/dx
         f_prime_op = Base.Cartesian.@ntuple($degree, i -> tree.op + i * ctx.nops[$degree])
         f_prime_simplifies_to = Base.Cartesian.@ntuple(
             $degree, i -> ctx.simplifies_to[$degree][f_prime_op[i]]
@@ -208,10 +207,17 @@ function _symbolic_derivative(
         return constructorof(N)(; val=zero(T))
     elseif tree.degree == 0 # && any_dependence
         return constructorof(N)(; val=one(T))
-    elseif tree.degree == 1
-        return deg1_derivative(tree, ctx)
-    else  # tree.degree == 2
-        return deg2_derivative(tree, ctx)
+    else
+        return _degn_derivative_dispatch(tree, ctx)
+    end
+end
+@generated function _degn_derivative_dispatch(
+    tree::N, ctx::SymbolicDerivativeContext
+) where {N<:AbstractExpressionNode}
+    D = max_degree(N)
+    return quote
+        deg = tree.degree
+        Base.Cartesian.@nif($D, i -> i == deg, i -> degn_derivative(tree, ctx, Val(i)))
     end
 end
 
