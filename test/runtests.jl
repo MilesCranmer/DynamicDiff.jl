@@ -4,7 +4,7 @@ using TestItemRunner
 if get(ENV, "DA_JET_TEST", "0") == "1"
     @safetestset "Code linting (JET.jl)" begin
         using Preferences
-        set_preferences!("DynamicDiff", "instability_check" => "disable"; force=true)
+        set_preferences!("DynamicDiff", "dispatch_doctor_mode" => "disable"; force=true)
         using JET
         using DynamicDiff
         JET.test_package(DynamicDiff; target_defined_modules=true)
