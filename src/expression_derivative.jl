@@ -208,8 +208,8 @@ end
             new_op_index -> Base.Cartesian.@nif(
                 $(degree + 1),
                 arg_index_plus_1 -> new_op_index <= arg_index_plus_1 * $nops,
-                arg_index_plus_1 -> let
-                    if arg_index_plus_1 == 1
+                arg_index_plus_1 -> begin
+                    if arg_index_plus_1 == 1  # COV_EXCL_LINE
                         # (This is the `[foo, bar]` branch discussed above)
                         operator_tuple[new_op_index]
                     else
