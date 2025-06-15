@@ -340,3 +340,35 @@ end
         )
     end
 end
+
+@testitem "Test 3-degree operators" begin
+    using DynamicExpressions
+    using DynamicDiff: D
+
+    operators = OperatorEnum(1 => (sin, cos), 2 => (+, *, /, -), 3 => (max, fma))
+
+    x1, x2, x3 = (Expression(Node{Float64,3}(; feature=i); operators) for i in 1:3)
+
+    @test D(sin(x1), 1)([1.0;;]) ≈ [cos(1.0)]
+
+    expr = fma(x1, 2 * x2, 3 * x3) - sin(x2)
+    d_expr = D(expr, 1)
+    @test repr(D(expr, 1)) == "(∂₁fma(x1, 2.0 * x2, 3.0 * x3) + 0.0) + 0.0"
+    @test D(expr, 1)([1.0 2.0 3.0]') ≈ [2.0 * 2.0]
+    # ^since fma(x,y,z) = x * y + z; thus ∂₁fma = y
+    @test repr(D(expr, 3)) == "(0.0 + 0.0) + (∂₃fma(x1, 2.0 * x2, 3.0 * x3) * 3.0)"
+    @test D(expr, 3)([1.0 2.0 3.0]') ≈ [3.0]
+    # ^since fma(x,y,z) = x * y + z; thus ∂₃fma = 1
+
+    expected_n_ops = (
+        length(operators[1]) * 2, length(operators[2]) * 3, length(operators[3]) * 4
+    )
+    for direction in 1:3
+        actual_n_ops = (
+            length(get_metadata(D(expr, direction)).operators[1]),
+            length(get_metadata(D(expr, direction)).operators[2]),
+            length(get_metadata(D(expr, direction)).operators[3]),
+        )
+        @test actual_n_ops == expected_n_ops
+    end
+end
