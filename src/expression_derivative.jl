@@ -60,17 +60,17 @@ tuple_length(::Type{<:Tuple{Vararg{Any,N}}}) where {N} = N::Int
 # These functions ensure compiler inference of the types, even for large tuples
 @generated function _classify_all_operators(ops::Tuple)
     quote
-        Base.Cartesian.@ntuple($(tuple_length(ops)), i -> _classify_operator(ops[i]))
+        Base.Cartesian.@ntuple($(tuple_length(ops)), i -> _classify_operator(ops[i]))  # COV_EXCL_LINE
     end
 end
 @generated function _has_operator(op::F, ops::Tuple) where {F}
     quote
-        Base.Cartesian.@nany($(tuple_length(ops)), i -> ops[i] == op)
+        Base.Cartesian.@nany($(tuple_length(ops)), i -> ops[i] == op)  # COV_EXCL_LINE
     end
 end
 @generated function _get_index(op::F, ops::Tuple) where {F}
     quote
-        Base.Cartesian.@nif($(tuple_length(ops)), i -> ops[i] == op, i -> i)
+        Base.Cartesian.@nif($(tuple_length(ops)), i -> ops[i] == op, i -> i)  # COV_EXCL_LINE
     end
 end
 
@@ -174,8 +174,12 @@ end
             if deg == 0
                 constructorof(N)(; val=one(T))
             else
-                Base.Cartesian.@nif(
-                    $D, i -> i == deg, i -> degn_derivative(tree, ctx, Val(i))::N
+                Base.Cartesian.@nif(  # COV_EXCL_LINE
+                    $D,
+                    i -> i == deg,  # COV_EXCL_LINE
+                    i -> begin  # COV_EXCL_LINE
+                        degn_derivative(tree, ctx, Val(i))::N
+                    end,
                 )
             end
         end
@@ -188,8 +192,9 @@ end
 ) where {nops}
     quote
         return OperatorEnum(
-            Base.Cartesian.@ntuple(
-                $nops, i -> _make_derivative_operators(operators[i], Val(i)),
+            Base.Cartesian.@ntuple(  # COV_EXCL_LINE
+                $nops,
+                i -> _make_derivative_operators(operators[i], Val(i)),
             ),
         )
     end
@@ -211,9 +216,9 @@ end
         # The `@ntuple` and `@nif` calls are used to make this generic to any
         # degree and any number of operators.
 
-        return Base.Cartesian.@ntuple(
+        return Base.Cartesian.@ntuple(  # COV_EXCL_LINE
             $((degree + 1) * nops),
-            new_op_index -> Base.Cartesian.@nif(
+            new_op_index -> Base.Cartesian.@nif(  # COV_EXCL_LINE
                 $(degree + 1),
                 arg_index_plus_1 -> new_op_index <= arg_index_plus_1 * $nops,
                 arg_index_plus_1 -> begin  # COV_EXCL_LINE
