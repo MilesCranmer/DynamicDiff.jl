@@ -3,10 +3,10 @@ using DynamicExpressions:
     AbstractExpressionNode,
     OperatorEnum,
     constructorof,
+    get_child,
+    get_children,
     DynamicExpressions as DE
 using DispatchDoctor: @unstable
-
-const DE_2 = isdefined(DE, :max_degree)
 
 """
     D(ex::AbstractExpression, feature::Integer)
@@ -36,31 +36,22 @@ Base.@kwdef struct SymbolicDerivativeContext{NUM_OP,SIMPLIFIES_TO}
     simplifies_to::SIMPLIFIES_TO
 end
 
-function _get_ops_tuple(operators::OperatorEnum)
-    if hasfield(OperatorEnum, :unaops)
-        # Old API
-        return (operators.unaops, operators.binops)
-    else
-        return operators.ops
-    end
-end
-
 function _make_context(
     operators::OperatorEnum, operators_with_derivatives::OperatorEnum, feature::Integer
 )
-    all_ops = _get_ops_tuple(operators)
-    all_ops_with_derivatives = _get_ops_tuple(operators_with_derivatives)
-    if length(all_ops) < 2 || !_has_operator(*, all_ops[2]) || !_has_operator(+, all_ops[2])
+    if length(operators) < 2 ||
+        !_has_operator(*, operators[2]) ||
+        !_has_operator(+, operators[2])
         throw(
             ArgumentError(
                 "Binary `*` or `+` operator missing from operators, so differentiation is not possible.",
             ),
         )
     end
-    nops = map(length, all_ops)
-    mult_idx = _get_index(*, all_ops[2])
-    plus_idx = _get_index(+, all_ops[2])
-    simplifies_to = map(_classify_all_operators, all_ops_with_derivatives)
+    nops = map(length, operators.ops)
+    mult_idx = _get_index(*, operators[2])
+    plus_idx = _get_index(+, operators[2])
+    simplifies_to = map(_classify_all_operators, operators_with_derivatives.ops)
     return SymbolicDerivativeContext(; feature, plus_idx, mult_idx, nops, simplifies_to)
 end
 
@@ -73,34 +64,6 @@ end
 end
 @generated function _get_index(op::F, ops::Tuple{Vararg{Any,N}}) where {F,N}
     return :(Base.Cartesian.@nif($N, i -> ops[i] == op, i -> i))
-end
-
-@inline @unstable function max_degree(::Type{N}) where {N<:AbstractExpressionNode}
-    return DE_2 ? DE.max_degree(N) : 2
-end
-@inline @unstable function get_child(tree::N, i::Int) where {N<:AbstractExpressionNode}
-    if DE_2
-        return DE.get_child(tree, i)
-    else
-        if i == 1
-            return tree.l
-        elseif i == 2
-            return tree.r
-        end
-    end
-end
-@inline @unstable function get_children(
-    tree::N, ::Val{d}
-) where {N<:AbstractExpressionNode,d}
-    if DE_2
-        return DE.get_children(tree, Val(d))
-    else
-        if d == 1
-            return (tree.l,)
-        elseif d == 2
-            return (tree.l, tree.r)
-        end
-    end
 end
 
 @generated function degn_derivative(
@@ -188,8 +151,7 @@ end
 
 @generated function _symbolic_derivative(
     tree::N, ctx::SymbolicDerivativeContext
-) where {T,N<:AbstractExpressionNode{T}}
-    D = max_degree(N)
+) where {T,D,N<:AbstractExpressionNode{T,D}}
     quote
         # NOTE: We cannot mutate the tree here!
 
@@ -213,21 +175,15 @@ end
     end
 end
 
-function _make_derivative_operators(operators::OperatorEnum)
-    all_ops = _get_ops_tuple(operators)
-    return _make_operator_enum(
-        ntuple(i -> _make_derivative_operators(all_ops[i], Val(i)), Val(length(all_ops)))
-    )
-    # TODO: I don't think these `Val(i)` are type stable
-end
-
-function _make_operator_enum(ops)
-    if DE_2
-        return OperatorEnum(ops)
-    else
-        @assert length(ops) == 2
-        unaops, binops = ops
-        return OperatorEnum(binops, unaops)  # Compat with old constructor
+@generated function _make_derivative_operators(
+    operators::OperatorEnum{<:Tuple{Vararg{Tuple,nops}}}
+) where {nops}
+    quote
+        return OperatorEnum(
+            Base.Cartesian.@ntuple(
+                $nops, i -> _make_derivative_operators(operators[i], Val(i)),
+            ),
+        )
     end
 end
 
