@@ -59,16 +59,19 @@ tuple_length(::Type{<:Tuple{Vararg{Any,N}}}) where {N} = N::Int
 
 # These functions ensure compiler inference of the types, even for large tuples
 @generated function _classify_all_operators(ops::Tuple)
-    N = tuple_length(ops)
-    return :(Base.Cartesian.@ntuple($N, i -> _classify_operator(ops[i])))
+    quote
+        Base.Cartesian.@ntuple($(tuple_length(ops)), i -> _classify_operator(ops[i]))
+    end
 end
 @generated function _has_operator(op::F, ops::Tuple) where {F}
-    N = tuple_length(ops)
-    return :(Base.Cartesian.@nany($N, i -> ops[i] == op))
+    quote
+        Base.Cartesian.@nany($(tuple_length(ops)), i -> ops[i] == op)
+    end
 end
 @generated function _get_index(op::F, ops::Tuple) where {F}
-    N = tuple_length(ops)
-    return :(Base.Cartesian.@nif($N, i -> ops[i] == op, i -> i))
+    quote
+        Base.Cartesian.@nif($(tuple_length(ops)), i -> ops[i] == op, i -> i)
+    end
 end
 
 @generated function degn_derivative(
@@ -213,7 +216,7 @@ end
             new_op_index -> Base.Cartesian.@nif(
                 $(degree + 1),
                 arg_index_plus_1 -> new_op_index <= arg_index_plus_1 * $nops,
-                arg_index_plus_1 -> begin
+                arg_index_plus_1 -> begin  # COV_EXCL_LINE
                     if arg_index_plus_1 == 1  # COV_EXCL_LINE
                         # (This is the `[foo, bar]` branch discussed above)
                         operator_tuple[new_op_index]
