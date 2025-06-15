@@ -1,7 +1,7 @@
 name = "DynamicDiff"
 uuid = "7317a516-7a03-4707-b902-c6dba1468ba0"
 authors = ["MilesCranmer <miles.cranmer@gmail.com> and contributors"]
-version = "0.2.1"
+version = "0.3.0"
 
 [deps]
 Compat = "34da2185-b29b-5c13-b0c7-acf172513d20"
@@ -12,6 +12,6 @@ ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 [compat]
 Compat = "4.16"
 DispatchDoctor = "0.4.17"
-DynamicExpressions = "1.6"
+DynamicExpressions = "~2.0.0"
 ForwardDiff = "0.10, 1"
 julia = "1.10"

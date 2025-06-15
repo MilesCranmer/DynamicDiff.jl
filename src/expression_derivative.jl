@@ -3,7 +3,10 @@ using DynamicExpressions:
     AbstractExpressionNode,
     OperatorEnum,
     constructorof,
+    get_child,
+    get_children,
     DynamicExpressions as DE
+using DispatchDoctor: @unstable
 
 """
     D(ex::AbstractExpression, feature::Integer)
@@ -25,197 +28,216 @@ function D(ex::AbstractExpression, feature::Integer)
 end
 
 # Holds metadata about the derivative computation.
-Base.@kwdef struct SymbolicDerivativeContext{TUP}
+Base.@kwdef struct SymbolicDerivativeContext{NUM_OP,SIMPLIFIES_TO}
     feature::Int
     plus_idx::Int
     mult_idx::Int
-    nbin::Int
-    nuna::Int
-    simplifies_to::TUP
+    nops::NUM_OP
+    simplifies_to::SIMPLIFIES_TO
 end
 
 function _make_context(
     operators::OperatorEnum, operators_with_derivatives::OperatorEnum, feature::Integer
 )
-    binops = operators.binops
-    unaops = operators.unaops
-    if !_has_operator(*, binops) || !_has_operator(+, binops)
+    if length(operators) < 2 ||
+        !_has_operator(*, operators[2]) ||
+        !_has_operator(+, operators[2])
         throw(
             ArgumentError(
-                "`*` or `+` operator missing from operators, so differentiation is not possible.",
+                "Binary `*` or `+` operator missing from operators, so differentiation is not possible.",
             ),
         )
     end
-    nbin = length(binops)
-    nuna = length(unaops)
-    mult_idx = _get_index(*, binops)
-    plus_idx = _get_index(+, binops)
-    simplifies_to = (;
-        unaops=_classify_all_operators(operators_with_derivatives.unaops),
-        binops=_classify_all_operators(operators_with_derivatives.binops),
-    )
-    return SymbolicDerivativeContext(;
-        feature, plus_idx, mult_idx, nbin, nuna, simplifies_to
-    )
+    nops = map(length, operators.ops)
+    mult_idx = _get_index(*, operators[2])
+    plus_idx = _get_index(+, operators[2])
+    simplifies_to = map(_classify_all_operators, operators_with_derivatives.ops)
+    return SymbolicDerivativeContext(; feature, plus_idx, mult_idx, nops, simplifies_to)
 end
+
+tuple_length(::Type{<:Tuple{Vararg{Any,N}}}) where {N} = N::Int
 
 # These functions ensure compiler inference of the types, even for large tuples
-@generated function _classify_all_operators(ops::Tuple{Vararg{Any,N}}) where {N}
-    return :(Base.Cartesian.@ntuple($N, i -> _classify_operator(ops[i])))
-end
-@generated function _has_operator(op::F, ops::Tuple{Vararg{Any,N}}) where {F,N}
-    return :(Base.Cartesian.@nany($N, i -> ops[i] == op))
-end
-@generated function _get_index(op::F, ops::Tuple{Vararg{Any,N}}) where {F,N}
-    return :(Base.Cartesian.@nif($N, i -> ops[i] == op, i -> i))
-end
-
-function _symbolic_derivative(
-    tree::N, ctx::SymbolicDerivativeContext
-) where {T,N<:AbstractExpressionNode{T}}
-    # NOTE: We cannot mutate the tree here! Since we use it twice.
-
-    # Quick test to see if we have any dependence on the feature, so
-    # we can return 0 for the branch
-    any_dependence = any(tree) do node
-        node.degree == 0 && !node.constant && node.feature == ctx.feature
+@generated function _classify_all_operators(ops::Tuple)
+    quote
+        Base.Cartesian.@ntuple($(tuple_length(ops)), i -> _classify_operator(ops[i]))  # COV_EXCL_LINE
     end
+end
+@generated function _has_operator(op::F, ops::Tuple) where {F}
+    quote
+        Base.Cartesian.@nany($(tuple_length(ops)), i -> ops[i] == op)  # COV_EXCL_LINE
+    end
+end
+@generated function _get_index(op::F, ops::Tuple) where {F}
+    quote
+        Base.Cartesian.@nif($(tuple_length(ops)), i -> ops[i] == op, i -> i)  # COV_EXCL_LINE
+    end
+end
 
-    if !any_dependence
-        return constructorof(N)(; val=zero(T))
-    elseif tree.degree == 0 # && any_dependence
-        return constructorof(N)(; val=one(T))
-    elseif tree.degree == 1
-        # f(g(x)) => f'(g(x)) * g'(x)
-        f_prime_op = tree.op + ctx.nuna
-        f_prime_simplifies_to = ctx.simplifies_to.unaops[f_prime_op]
-
-        ### We do some simplification based on zero/one derivatives ###
-        if f_prime_simplifies_to == Zero
-            # 0 * g' => 0
-            return constructorof(N)(; val=zero(T))
-        else
-            g_prime = _symbolic_derivative(tree.l, ctx)
-            if g_prime.degree == 0 && g_prime.constant && iszero(g_prime.val)
-                # f' * 0 => 0
-                return g_prime
-            else
-                f_prime = if f_prime_simplifies_to == NegOne
-                    constructorof(N)(; val=-one(T))
-                else
-                    constructorof(N)(; op=f_prime_op, l=tree.l)
-                end
-
-                if f_prime_simplifies_to == One
-                    # 1 * g' => g'
-                    return g_prime
-                elseif g_prime.degree == 0 && g_prime.constant && isone(g_prime.val)
-                    # f' * 1 => f'
-                    return f_prime
-                else
-                    return constructorof(N)(; op=ctx.mult_idx, l=f_prime, r=g_prime)
-                end
-            end
-        end
-    else  # tree.degree == 2
-        # f(g(x), h(x)) => f^(1,0)(g(x), h(x)) * g'(x) + f^(0,1)(g(x), h(x)) * h'(x)
-        f_prime_left_op = tree.op + ctx.nbin
-        f_prime_right_op = tree.op + 2 * ctx.nbin
-        f_prime_left_simplifies_to = ctx.simplifies_to.binops[f_prime_left_op]
-        f_prime_right_simplifies_to = ctx.simplifies_to.binops[f_prime_right_op]
+@generated function degn_derivative(
+    tree::N, ctx::SymbolicDerivativeContext, ::Val{degree}
+) where {T,N<:AbstractExpressionNode{T},degree}
+    quote
+        # df/dx => ∑ᵢ (∂ᵢf)(args...) * dargs[i]/dx
+        f_prime_op = Base.Cartesian.@ntuple($degree, i -> tree.op + i * ctx.nops[$degree])
+        f_prime_simplifies_to = Base.Cartesian.@ntuple(
+            $degree, i -> ctx.simplifies_to[$degree][f_prime_op[i]]
+        )
 
         ### We do some simplification based on zero/one derivatives ###
-        first_term = if f_prime_left_simplifies_to == Zero
-            # 0 * g' => 0
-            constructorof(N)(; val=zero(T))
-        else
-            g_prime = _symbolic_derivative(tree.l, ctx)
-
-            if f_prime_left_simplifies_to == One
-                # 1 * g' => g'
-                g_prime
-            elseif g_prime.degree == 0 && g_prime.constant && iszero(g_prime.val)
-                # f' * 0 => 0
-                g_prime
-            else
-                f_prime_left = if f_prime_left_simplifies_to == NegOne
-                    constructorof(N)(; val=-one(T))
-                elseif f_prime_left_simplifies_to == First
-                    tree.l
-                elseif f_prime_left_simplifies_to == Last
-                    tree.r
+        terms = Base.Cartesian.@ntuple(
+            $degree,
+            i -> let
+                if f_prime_simplifies_to[i] == Zero
+                    # 0 * g' => 0
+                    constructorof(N)(; val=zero(T))
                 else
-                    constructorof(N)(; op=f_prime_left_op, l=tree.l, r=tree.r)
-                end
+                    g_prime = _symbolic_derivative(get_child(tree, i), ctx)::N
+                    if f_prime_simplifies_to[i] == One
+                        # 1 * g' => g'
+                        g_prime
+                    elseif g_prime.degree == 0 && g_prime.constant && iszero(g_prime.val)
+                        # f' * 0 => 0
+                        g_prime
+                    else
+                        f_prime = if f_prime_simplifies_to[i] == NegOne
+                            constructorof(N)(; val=-one(T))
+                        elseif f_prime_simplifies_to[i] == First
+                            get_child(tree, 1)
+                        elseif f_prime_simplifies_to[i] == Last
+                            get_child(tree, $degree)
+                        else
+                            constructorof(N)(;
+                                op=f_prime_op[i],
+                                children=get_children(tree, Val($degree)),
+                            )
+                        end
 
-                if g_prime.degree == 0 && g_prime.constant && isone(g_prime.val)
-                    # f' * 1 => f'
-                    f_prime_left
-                else
-                    # f' * g'
-                    constructorof(N)(; op=ctx.mult_idx, l=f_prime_left, r=g_prime)
+                        if g_prime.degree == 0 && g_prime.constant && isone(g_prime.val)
+                            # f' * 1 => f'
+                            f_prime
+                        else
+                            # f' * g'
+                            constructorof(N)(; op=ctx.mult_idx, children=(f_prime, g_prime))
+                        end
+                    end
                 end
             end
-        end
-
-        second_term = if f_prime_right_simplifies_to == Zero
-            # Simplify and just give zero
-            constructorof(N)(; val=zero(T))
-        else
-            h_prime = _symbolic_derivative(tree.r, ctx)
-            if f_prime_right_simplifies_to == One
-                h_prime
-            elseif h_prime.degree == 0 && h_prime.constant && iszero(h_prime.val)
-                h_prime
-            else
-                f_prime_right = if f_prime_right_simplifies_to == NegOne
-                    constructorof(N)(; val=-one(T))
-                elseif f_prime_right_simplifies_to == First
-                    tree.l
-                elseif f_prime_right_simplifies_to == Last
-                    tree.r
-                else
-                    constructorof(N)(; op=f_prime_right_op, l=tree.l, r=tree.r)
-                end
-                if h_prime.degree == 0 && h_prime.constant && isone(h_prime.val)
-                    f_prime_right
-                else
-                    constructorof(N)(; op=ctx.mult_idx, l=f_prime_right, r=h_prime)
-                end
-            end
-        end
+        )
 
         # Simplify if either term is zero
-        if first_term.degree == 0 && first_term.constant && iszero(first_term.val)
-            return second_term
-        elseif second_term.degree == 0 && second_term.constant && iszero(second_term.val)
-            return first_term
-        else
-            return constructorof(N)(; op=ctx.plus_idx, l=first_term, r=second_term)
+        if length(terms) == 2
+            first_term = first(terms)
+            second_term = last(terms)
+            if first_term.degree == 0 && first_term.constant && iszero(first_term.val)
+                return second_term
+            elseif second_term.degree == 0 &&
+                second_term.constant &&
+                iszero(second_term.val)
+                return first_term
+            end
         end
+        # Need to stitch together the terms with the plus operator
+        if length(terms) == 1
+            return only(terms)
+        end
+        return stitch_terms(terms, ctx)
     end
 end
 
-function _make_derivative_operators(operators::OperatorEnum)
-    unaops = operators.unaops
-    binops = operators.binops
-    new_unaops = ntuple(
-        i -> if i <= length(unaops)
-            unaops[i]
+function stitch_terms(
+    terms::Tuple{N,Vararg{N}}, ctx::SymbolicDerivativeContext
+) where {N<:AbstractExpressionNode}
+    return foldl((l, r) -> constructorof(N)(; op=ctx.plus_idx, children=(l, r)), terms)
+end
+
+function _any_dependence(tree::AbstractExpressionNode, feature::Integer)
+    any(tree) do node
+        node.degree == 0 && !node.constant && node.feature == feature
+    end
+end
+
+@generated function _symbolic_derivative(
+    tree::N, ctx::SymbolicDerivativeContext
+) where {T,D,N<:AbstractExpressionNode{T,D}}
+    quote
+        # NOTE: We cannot mutate the tree here!
+
+        # Quick test to see if we have any dependence on the feature, so
+        # we can return 0 for the branch
+        any_dependence = _any_dependence(tree, ctx.feature)
+
+        deg = tree.degree
+        out = if !any_dependence
+            constructorof(N)(; val=zero(T))
         else
-            operator_derivative(unaops[i - length(unaops)], Val(1), Val(1))
-        end,
-        Val(2 * length(unaops)),
-    )
-    new_binops = ntuple(
-        i -> if i <= length(binops)
-            binops[i]
-        elseif i <= 2 * length(binops)
-            operator_derivative(binops[i - length(binops)], Val(2), Val(1))
-        else
-            operator_derivative(binops[i - 2 * length(binops)], Val(2), Val(2))
-        end,
-        Val(3 * length(binops)),
-    )
-    return OperatorEnum(new_binops, new_unaops)
+            if deg == 0
+                constructorof(N)(; val=one(T))
+            else
+                Base.Cartesian.@nif(  # COV_EXCL_LINE
+                    $D,
+                    i -> i == deg,  # COV_EXCL_LINE
+                    i -> begin  # COV_EXCL_LINE
+                        degn_derivative(tree, ctx, Val(i))::N
+                    end,
+                )
+            end
+        end
+        return out::N
+    end
+end
+
+@generated function _make_derivative_operators(
+    operators::OperatorEnum{<:Tuple{Vararg{Tuple,nops}}}
+) where {nops}
+    quote
+        return OperatorEnum(
+            Base.Cartesian.@ntuple(  # COV_EXCL_LINE
+                $nops,
+                i -> _make_derivative_operators(operators[i], Val(i)),
+            ),
+        )
+    end
+end
+
+@generated function _make_derivative_operators(
+    operator_tuple::Tuple{Vararg{Any,nops}}, ::Val{degree}
+) where {nops,degree}
+    quote
+        # Essentially what this does is
+        #
+        # 1. For unary operators:
+        #      (foo, bar) -> (foo, bar, ∂foo, ∂bar)
+        # 2. For binary operators:
+        #      (foo, bar) -> (foo, bar, ∂₁foo, ∂₁bar, ∂₂foo, ∂₂bar)
+        #
+        # and so on, for any degree and any number of operators.
+        #
+        # The `@ntuple` and `@nif` calls are used to make this generic to any
+        # degree and any number of operators.
+
+        return Base.Cartesian.@ntuple(  # COV_EXCL_LINE
+            $((degree + 1) * nops),
+            new_op_index -> Base.Cartesian.@nif(  # COV_EXCL_LINE
+                $(degree + 1),
+                arg_index_plus_1 -> new_op_index <= arg_index_plus_1 * $nops,
+                arg_index_plus_1 -> begin  # COV_EXCL_LINE
+                    if arg_index_plus_1 == 1  # COV_EXCL_LINE
+                        # (This is the `[foo, bar]` branch discussed above)
+                        operator_tuple[new_op_index]
+                    else
+                        # This is the `[∂₁foo, ∂₁bar]` branch. Note that `arg_index_plus_1`
+                        # is essentially used as the subscript for the derivative (plus 1)
+                        # So literally `∂₁foo` would be `arg_index_plus_1 == 2`, and
+                        # `operator_tuple[new_op_index - (arg_index_plus_1 - 1) * $nops] == foo`
+                        operator_derivative(
+                            operator_tuple[new_op_index - (arg_index_plus_1 - 1) * $nops],
+                            Val($degree),
+                            Val(arg_index_plus_1 - 1),
+                        )
+                    end
+                end
+            )
+        )
+    end
 end
