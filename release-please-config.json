@@ -1,0 +1,11 @@
+{
+  "bootstrap-sha": "2572e78427cccde58c04ec40ebc3c6860e2b13a8",
+  "packages": {
+    ".": {
+      "release-type": "julia",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true,
+      "include-component-in-tag": false
+    }
+  }
+}
