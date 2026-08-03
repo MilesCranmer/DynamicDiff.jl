@@ -7,7 +7,7 @@ if get(ENV, "DA_JET_TEST", "0") == "1"
         set_preferences!("DynamicDiff", "dispatch_doctor_mode" => "disable"; force=true)
         using JET
         using DynamicDiff
-        JET.test_package(DynamicDiff; target_defined_modules=true)
+        JET.test_package(DynamicDiff)
     end
 else
     @eval @run_package_tests verbose = true
