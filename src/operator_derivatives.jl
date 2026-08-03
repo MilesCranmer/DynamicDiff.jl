@@ -65,7 +65,7 @@ function (f::FixImaginary)(real_part)
     return f.f(complex(real_part, f.imaginary_part))
 end
 
-function _forward_derivative(f, x)
+function _forward_derivative(f::F, x) where {F}
     return ForwardDiff.derivative(f, x)
 end
 
