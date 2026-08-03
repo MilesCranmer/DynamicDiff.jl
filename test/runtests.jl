@@ -267,6 +267,42 @@ end
     @test D(ex, 2)([3.0 4.0]') ≈ [8.0]
 end
 
+@testitem "Test complex derivatives" begin
+    using DynamicDiff: D, operator_derivative
+    using DynamicExpressions: Expression, Node, OperatorEnum, @declare_expression_operator
+
+    square_plus_one(z) = z * z + one(z)
+    bilinear_plus_left(z, w) = z * w + z
+    @declare_expression_operator(square_plus_one, 1)
+    @declare_expression_operator(bilinear_plus_left, 2)
+
+    operators = OperatorEnum(;
+        unary_operators=(sin, square_plus_one),
+        binary_operators=(+, -, *, /, bilinear_plus_left),
+    )
+    variable_names = ["z", "w"]
+    z, w = (
+        Expression(Node{ComplexF64}(; feature=i); operators, variable_names) for i in 1:2
+    )
+    input = reshape(ComplexF64[1 + 2im, 3 - 1im], 2, 1)
+
+    @test D(z * z + sin(z), 1)(input) ≈ [2 * input[1, 1] + cos(input[1, 1])]
+    @test D(square_plus_one(z), 1)(input) ≈ [2 * input[1, 1]]
+    @test D(D(square_plus_one(z), 1), 1)(input) ≈ ComplexF64[2]
+    @test D(bilinear_plus_left(z, w), 1)(input) ≈ [input[2, 1] + 1]
+    @test D(bilinear_plus_left(z, w), 2)(input) ≈ [input[1, 1]]
+    @test D(sin(z), 2)(input) == ComplexF64[0]
+
+    unary_derivative = operator_derivative(square_plus_one, Val(1), Val(1))
+    binary_derivative = operator_derivative(bilinear_plus_left, Val(2), Val(2))
+    for T in (Float32, Float64, BigFloat)
+        z_value = complex(T(1), T(2))
+        w_value = complex(T(3), -T(1))
+        @test @inferred(unary_derivative(z_value)) ≈ 2 * z_value
+        @test @inferred(binary_derivative(z_value, w_value)) ≈ z_value
+    end
+end
+
 @testitem "Missing coverage" begin
     # Due to Coverage.jl missing inlined functions, we test explicitly
     using DynamicDiff: D, _classify_operator, _zero, _one, _n_one, _first

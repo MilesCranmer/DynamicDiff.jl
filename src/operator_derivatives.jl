@@ -47,13 +47,31 @@ Base.show(io::IO, ::MIME"text/plain", g::OperatorDerivative) = show(io, g)
 
 # Generic derivatives:
 function (d::OperatorDerivative{F,1,1})(x) where {F}
-    return ForwardDiff.derivative(d.op, x)
+    return _forward_derivative(d.op, x)
 end
 function (d::OperatorDerivative{F,D,i})(args::Vararg{Any,D}) where {F,D,i}
-    return ForwardDiff.derivative(
+    return _forward_derivative(
         FixExcept{i}(d.op, args[begin:(begin + (i - 2))]..., args[(begin + i):end]...),
         args[i],
     )
+end
+
+struct FixImaginary{F,T} <: Function
+    f::F
+    imaginary_part::T
+end
+
+function (f::FixImaginary)(real_part)
+    return f.f(complex(real_part, f.imaginary_part))
+end
+
+function _forward_derivative(f, x)
+    return ForwardDiff.derivative(f, x)
+end
+
+function _forward_derivative(f::F, x::Complex{T}) where {F,T}
+    derivative = ForwardDiff.derivative(FixImaginary(f, imag(x)), real(x))
+    return convert(Complex{T}, derivative)::Complex{T}
 end
 
 #! format: off

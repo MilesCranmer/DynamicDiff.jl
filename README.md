@@ -26,6 +26,18 @@ Evaluation then can simply call the result with standard [DynamicExpressions.jl]
 
 This operator can be nested an arbitrary number of times.
 
+### Complex numbers
+
+Expressions whose nodes store `Complex{T}` values can be differentiated when their
+operators are holomorphic. The generic derivative fallback evaluates a ForwardDiff
+derivative along the real component, which equals the complex derivative for a
+holomorphic operator. This supports custom unary and multi-argument operators as well
+as higher-order derivatives.
+
+Operators such as `abs`, `conj`, `real`, and `imag` are non-holomorphic. Define an
+`operator_derivative` method with the convention required by your application before
+using such an operator in a complex-valued expression.
+
 ## Performance
 
 Let's see an example.
