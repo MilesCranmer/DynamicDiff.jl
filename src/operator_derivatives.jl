@@ -113,7 +113,14 @@ function _complex_derivative(f::F, x::Complex{T}, ::Val{false}) where {F,T}
     return convert(Complex{T}, real_derivative)::Complex{T}
 end
 
-_known_nonholomorphic_operator(op) = op in (abs, abs2, sign, conj, real, imag)
+function _known_nonholomorphic_operator(op)
+    return op === abs ||
+           op === abs2 ||
+           op === sign ||
+           op === conj ||
+           op === real ||
+           op === imag
+end
 
 #! format: off
 # Special Cases (only ones we can implement "closed loops" for)
