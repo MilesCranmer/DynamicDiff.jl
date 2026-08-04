@@ -41,7 +41,7 @@ end
 Return `true` to skip runtime Cauchy-Riemann checks for complex derivatives of `op`.
 Only extend this trait for operators known to be holomorphic.
 """
-assume_holomorphic(::Any) = false
+assume_holomorphic(::Any) = false  # COV_EXCL_LINE
 assume_holomorphic(d::OperatorDerivative) = assume_holomorphic(d.op)
 assume_holomorphic(f::FixExcept) = assume_holomorphic(f.f)
 
@@ -113,13 +113,7 @@ function _complex_derivative(f::F, x::Complex{T}, ::Val{false}) where {F,T}
     return convert(Complex{T}, real_derivative)::Complex{T}
 end
 
-_known_nonholomorphic_operator(::Any) = false
-_known_nonholomorphic_operator(::typeof(abs)) = true
-_known_nonholomorphic_operator(::typeof(abs2)) = true
-_known_nonholomorphic_operator(::typeof(sign)) = true
-_known_nonholomorphic_operator(::typeof(conj)) = true
-_known_nonholomorphic_operator(::typeof(real)) = true
-_known_nonholomorphic_operator(::typeof(imag)) = true
+_known_nonholomorphic_operator(op) = op in (abs, abs2, sign, conj, real, imag)
 
 #! format: off
 # Special Cases (only ones we can implement "closed loops" for)

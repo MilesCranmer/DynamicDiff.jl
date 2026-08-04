@@ -339,8 +339,14 @@ end
     @test_throws DomainError conjugate_derivative(1.0 + 2.0im)
     @test_throws DomainError operator_derivative(real, Val(1), Val(1))(1.0 + 2.0im)
     @test_throws DomainError operator_derivative(imag, Val(1), Val(1))(1.0 + 2.0im)
-    for op in (abs, abs2, sign, conj, real, imag)
+    # `Any` vectors force runtime dispatch; a plain tuple is unrolled and
+    # constant-folded, which hides these one-line methods from coverage.
+    for op in Any[abs, abs2, sign, conj, real, imag]
         @test _known_nonholomorphic_operator(op)
+    end
+    for op in Any[sin, +]
+        @test !_known_nonholomorphic_operator(op)
+        @test !assume_holomorphic(op)
     end
 
     # Known non-holomorphic operators fail while building a dependent derivative.
