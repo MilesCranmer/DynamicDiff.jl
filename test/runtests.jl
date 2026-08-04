@@ -268,7 +268,7 @@ end
 end
 
 @testitem "Test complex derivatives" begin
-    using DynamicDiff: D, operator_derivative
+    using DynamicDiff: D, operator_derivative, _known_nonholomorphic_operator
     import DynamicDiff: assume_holomorphic
     using DynamicExpressions: Expression, Node, OperatorEnum, @declare_expression_operator
 
@@ -339,6 +339,9 @@ end
     @test_throws DomainError conjugate_derivative(1.0 + 2.0im)
     @test_throws DomainError operator_derivative(real, Val(1), Val(1))(1.0 + 2.0im)
     @test_throws DomainError operator_derivative(imag, Val(1), Val(1))(1.0 + 2.0im)
+    for op in (abs, abs2, sign, conj, real, imag)
+        @test _known_nonholomorphic_operator(op)
+    end
 
     # Known non-holomorphic operators fail while building a dependent derivative.
     nonholomorphic_operators = OperatorEnum(;
