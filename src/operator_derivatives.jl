@@ -35,6 +35,16 @@ struct OperatorDerivative{F,degree,arg} <: Function
     op::F
 end
 
+"""
+    assume_holomorphic(op)
+
+Return `true` to skip runtime Cauchy-Riemann checks for complex derivatives of `op`.
+Only extend this trait for operators known to be holomorphic.
+"""
+assume_holomorphic(::Any) = false
+assume_holomorphic(d::OperatorDerivative) = assume_holomorphic(d.op)
+assume_holomorphic(f::FixExcept) = assume_holomorphic(f.f)
+
 function Base.show(io::IO, g::OperatorDerivative{F,degree,arg}) where {F,degree,arg}
     print(io, "∂")
     if degree > 1
@@ -65,14 +75,51 @@ function (f::FixImaginary)(real_part)
     return f.f(complex(real_part, f.imaginary_part))
 end
 
+struct FixReal{F,T} <: Function
+    f::F
+    real_part::T
+end
+
+function (f::FixReal)(imaginary_part)
+    return f.f(complex(f.real_part, imaginary_part))
+end
+
 function _forward_derivative(f::F, x) where {F}
     return ForwardDiff.derivative(f, x)
 end
 
 function _forward_derivative(f::F, x::Complex{T}) where {F,T}
+    return _complex_derivative(f, x, Val(assume_holomorphic(f)))
+end
+
+function _complex_derivative(f::F, x::Complex{T}, ::Val{true}) where {F,T}
     derivative = ForwardDiff.derivative(FixImaginary(f, imag(x)), real(x))
     return convert(Complex{T}, derivative)::Complex{T}
 end
+
+function _complex_derivative(f::F, x::Complex{T}, ::Val{false}) where {F,T}
+    real_derivative = ForwardDiff.derivative(FixImaginary(f, imag(x)), real(x))
+    imaginary_derivative = ForwardDiff.derivative(FixReal(f, real(x)), imag(x))
+    if !isapprox(imaginary_derivative, im * real_derivative)
+        throw(
+            DomainError(
+                x,
+                "operator does not satisfy the Cauchy-Riemann equations at this input; " *
+                "define an explicit derivative or extend `assume_holomorphic` only if " *
+                "the operator is known to be holomorphic",
+            ),
+        )
+    end
+    return convert(Complex{T}, real_derivative)::Complex{T}
+end
+
+_known_nonholomorphic_operator(::Any) = false
+_known_nonholomorphic_operator(::typeof(abs)) = true
+_known_nonholomorphic_operator(::typeof(abs2)) = true
+_known_nonholomorphic_operator(::typeof(sign)) = true
+_known_nonholomorphic_operator(::typeof(conj)) = true
+_known_nonholomorphic_operator(::typeof(real)) = true
+_known_nonholomorphic_operator(::typeof(imag)) = true
 
 #! format: off
 # Special Cases (only ones we can implement "closed loops" for)
