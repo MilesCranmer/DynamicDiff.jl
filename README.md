@@ -28,30 +28,15 @@ This operator can be nested an arbitrary number of times.
 
 ### Complex numbers
 
-Expressions whose nodes store `Complex{T}` values can be differentiated when their
-operators are holomorphic. The generic derivative fallback evaluates a ForwardDiff
-derivative along the real component, which equals the complex derivative for a
-holomorphic operator. This supports custom unary and multi-argument operators as well
-as higher-order derivatives.
-
-For custom operators, DynamicDiff also evaluates the derivative along the imaginary
-component and checks the Cauchy-Riemann equations. It throws a `DomainError` when they
-do not hold. This pointwise check catches common non-holomorphic operators, although it
-cannot prove holomorphicity in a neighbourhood.
-
-The imaginary-direction evaluation can be skipped for an operator known to be
-holomorphic:
+Complex-valued expressions are supported for holomorphic operators. DynamicDiff checks
+custom operators against the Cauchy-Riemann equations and rejects known non-holomorphic
+operators. Skip the check for a custom operator known to be holomorphic with:
 
 ```julia
 import DynamicDiff: assume_holomorphic
 
 assume_holomorphic(::typeof(my_operator)) = true
 ```
-
-This opt-in is propagated to higher-order derivatives and should only be used when the
-operator is known to be holomorphic. Known non-holomorphic operators such as `abs`,
-`abs2`, `sign`, `conj`, `real`, and `imag` fail before a dependent complex derivative
-is constructed.
 
 ## Performance
 
