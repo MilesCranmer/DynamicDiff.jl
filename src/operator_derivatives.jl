@@ -92,6 +92,7 @@ function _forward_derivative(f::F, x::Complex{T}) where {F,T}
     return _complex_derivative(f, x, Val(assume_holomorphic(f)))
 end
 
+# DynamicExpressions requires operators to remain closed over the expression element type.
 function _complex_derivative(f::F, x::Complex{T}, ::Val{true}) where {F,T}
     derivative = ForwardDiff.derivative(FixImaginary(f, imag(x)), real(x))
     return convert(Complex{T}, derivative)::Complex{T}
