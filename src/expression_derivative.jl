@@ -198,7 +198,6 @@ end
 @generated function _reject_known_nonholomorphic_operator(
     node::AbstractExpressionNode{T,D}, operators::OperatorEnum, feature::Integer
 ) where {T,D}
-    D == 0 && return :(nothing)
     return quote
         degree = node.degree
         Base.Cartesian.@nif(
