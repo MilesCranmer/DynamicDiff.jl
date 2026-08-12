@@ -268,7 +268,11 @@ end
 end
 
 @testitem "Test complex derivatives" begin
-    using DynamicDiff: D, operator_derivative, _known_nonholomorphic_operator
+    using DynamicDiff:
+        D,
+        operator_derivative,
+        _known_nonholomorphic_operator,
+        _reject_known_nonholomorphic_operator
     import DynamicDiff: assume_holomorphic
     using DynamicExpressions: Expression, Node, OperatorEnum, @declare_expression_operator
 
@@ -351,7 +355,7 @@ end
 
     # Known non-holomorphic operators fail while building a dependent derivative.
     nonholomorphic_operators = OperatorEnum(;
-        unary_operators=(abs, sign), binary_operators=(+, *)
+        unary_operators=(abs, sign, sin), binary_operators=(+, *)
     )
     complex_variable = Expression(
         Node{ComplexF64}(; feature=1);
@@ -360,6 +364,16 @@ end
     )
     @test_throws DomainError D(abs(complex_variable), 1)
     @test_throws DomainError D(sign(complex_variable), 1)
+    @test @inferred(
+        _reject_known_nonholomorphic_operator(
+            sin(complex_variable).tree, nonholomorphic_operators, 1
+        )
+    ) === nothing
+    @test @inferred(
+        _reject_known_nonholomorphic_operator(
+            (complex_variable * complex_variable).tree, nonholomorphic_operators, 1
+        )
+    ) === nothing
     @test D(abs(complex_variable), 2)(reshape(ComplexF64[1 + 2im], 1, 1)) == ComplexF64[0]
 
     # A pointwise Cauchy-Riemann check cannot prove holomorphicity in a neighbourhood.

@@ -164,20 +164,57 @@ function _reject_known_nonholomorphic_operators(
     return nothing
 end
 
+function _reject_known_nonholomorphic_operator(
+    op::F, node::AbstractExpressionNode, feature::Integer
+) where {F}
+    if _known_nonholomorphic_operator(op) && _any_dependence(node, feature)
+        throw(
+            DomainError(
+                op,
+                "operator is not holomorphic and depends on the differentiation variable",
+            ),
+        )
+    end
+    return nothing
+end
+
+@generated function _reject_known_nonholomorphic_operator(
+    node::AbstractExpressionNode, operators::O, feature::Integer, ::Val{degree}
+) where {O<:OperatorEnum,degree}
+    ops_type = fieldtype(O, :ops)
+    nops = degree > tuple_length(ops_type) ? 0 : tuple_length(fieldtype(ops_type, degree))
+    nops == 0 && return :(nothing)
+    return quote
+        op_index = node.op
+        Base.Cartesian.@nif(
+            $nops,
+            i -> i == op_index,
+            i ->
+                _reject_known_nonholomorphic_operator(operators[$degree][i], node, feature),
+        )
+    end
+end
+
+@generated function _reject_known_nonholomorphic_operator(
+    node::AbstractExpressionNode{T,D}, operators::OperatorEnum, feature::Integer
+) where {T,D}
+    D == 0 && return :(nothing)
+    return quote
+        degree = node.degree
+        Base.Cartesian.@nif(
+            $D,
+            d -> d == degree,
+            d -> _reject_known_nonholomorphic_operator(node, operators, feature, Val(d)),
+        )
+    end
+end
+
 function _reject_known_nonholomorphic_operators(
     tree::AbstractExpressionNode{T}, operators::OperatorEnum, feature::Integer
 ) where {T<:Complex}
     any(tree) do node
         node.degree == 0 && return false
-        op = operators[Int(node.degree)][Int(node.op)]
-        if _known_nonholomorphic_operator(op) && _any_dependence(node, feature)
-            throw(
-                DomainError(
-                    op,
-                    "operator is not holomorphic and depends on the differentiation variable",
-                ),
-            )
-        end
+        _reject_known_nonholomorphic_operator(node, operators, feature)
         return false
     end
     return nothing
