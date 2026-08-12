@@ -26,18 +26,6 @@ Evaluation then can simply call the result with standard [DynamicExpressions.jl]
 
 This operator can be nested an arbitrary number of times.
 
-### Complex numbers
-
-Complex-valued expressions are supported for holomorphic operators. DynamicDiff checks
-custom operators against the Cauchy-Riemann equations and rejects known non-holomorphic
-operators. Skip the check for a custom operator known to be holomorphic with:
-
-```julia
-import DynamicDiff: assume_holomorphic
-
-assume_holomorphic(::typeof(my_operator)) = true
-```
-
 ## Performance
 
 Let's see an example.
@@ -99,4 +87,16 @@ derivative of an expression and then evaluate it on 32 batches:
 ```julia
 julia> @btime D($f, 1)(x) setup=(x = randn(2, 32));
   187.132 ns (4 allocations: 416 bytes)
+```
+
+## Complex numbers
+
+Complex-valued expressions are supported for holomorphic operators. DynamicDiff checks
+custom operators against the Cauchy-Riemann equations and rejects known non-holomorphic
+operators. Skip the check for a custom operator known to be holomorphic with:
+
+```julia
+import DynamicDiff: assume_holomorphic
+
+assume_holomorphic(::typeof(my_operator)) = true
 ```
