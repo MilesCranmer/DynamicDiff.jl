@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/MilesCranmer/DynamicDiff.jl/compare/v0.3.1...v0.3.2) (2026-08-13)
+
+
+### Features
+
+* support complex-valued derivatives ([#10](https://github.com/MilesCranmer/DynamicDiff.jl/issues/10)) ([9beeb6a](https://github.com/MilesCranmer/DynamicDiff.jl/commit/9beeb6aedddc05859c3b7701211601cc809fa1a8))
+
 ## [0.3.1](https://github.com/MilesCranmer/DynamicDiff.jl/compare/v0.3.0...v0.3.1) (2025-06-25)
 
 ## [0.3.0](https://github.com/MilesCranmer/DynamicDiff.jl/compare/v0.2.1...v0.3.0) (2025-06-15)
