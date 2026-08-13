@@ -19,6 +19,7 @@ function D(ex::AbstractExpression, feature::Integer)
     raw_metadata = getfield(metadata, :_data)  # TODO: Upstream this so we can load this
     operators = DE.get_operators(ex)
     tree = DE.get_contents(ex)
+    _reject_known_nonholomorphic_operators(tree, operators, feature)
     operators_with_derivatives = _make_derivative_operators(operators)
     ctx = _make_context(operators, operators_with_derivatives, feature)
     d_tree = _symbolic_derivative(tree, ctx)
@@ -155,6 +156,68 @@ function _any_dependence(tree::AbstractExpressionNode, feature::Integer)
     any(tree) do node
         node.degree == 0 && !node.constant && node.feature == feature
     end
+end
+
+function _reject_known_nonholomorphic_operators(
+    ::AbstractExpressionNode, ::OperatorEnum, ::Integer
+)
+    return nothing
+end
+
+function _reject_known_nonholomorphic_operator(
+    op::F, node::AbstractExpressionNode, feature::Integer
+) where {F}
+    if _known_nonholomorphic_operator(op) && _any_dependence(node, feature)
+        throw(
+            DomainError(
+                op,
+                "operator is not holomorphic and depends on the differentiation variable",
+            ),
+        )
+    end
+    return nothing
+end
+
+@generated function _reject_known_nonholomorphic_operator(
+    node::AbstractExpressionNode, operators::O, feature::Integer, ::Val{degree}
+) where {O<:OperatorEnum,degree}
+    ops_type = fieldtype(O, :ops)
+    nops = degree > tuple_length(ops_type) ? 0 : tuple_length(fieldtype(ops_type, degree))
+    nops == 0 && return :(nothing)
+    return quote
+        op_index = node.op
+        Base.Cartesian.@nif(
+            $nops,
+            i -> i == op_index,  # COV_EXCL_LINE
+            i ->  # COV_EXCL_LINE
+                _reject_known_nonholomorphic_operator(operators[$degree][i], node, feature),
+        )
+    end
+end
+
+@generated function _reject_known_nonholomorphic_operator(
+    node::AbstractExpressionNode{T,D}, operators::OperatorEnum, feature::Integer
+) where {T,D}
+    return quote
+        degree = node.degree
+        Base.Cartesian.@nif(
+            $D,
+            d -> d == degree,  # COV_EXCL_LINE
+            d ->  # COV_EXCL_LINE
+                _reject_known_nonholomorphic_operator(node, operators, feature, Val(d)),
+        )
+    end
+end
+
+function _reject_known_nonholomorphic_operators(
+    tree::AbstractExpressionNode{T}, operators::OperatorEnum, feature::Integer
+) where {T<:Complex}
+    any(tree) do node
+        node.degree == 0 && return false
+        _reject_known_nonholomorphic_operator(node, operators, feature)
+        return false
+    end
+    return nothing
 end
 
 @generated function _symbolic_derivative(

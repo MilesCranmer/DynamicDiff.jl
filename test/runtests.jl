@@ -7,7 +7,7 @@ if get(ENV, "DA_JET_TEST", "0") == "1"
         set_preferences!("DynamicDiff", "dispatch_doctor_mode" => "disable"; force=true)
         using JET
         using DynamicDiff
-        JET.test_package(DynamicDiff; target_defined_modules=true)
+        JET.test_package(DynamicDiff)
     end
 else
     @eval @run_package_tests verbose = true
@@ -16,6 +16,7 @@ end
     using DynamicDiff
     using Aqua
     Aqua.test_all(DynamicDiff)
+    @test :assume_holomorphic ∉ names(DynamicDiff)
 end
 
 @testitem "Test symbolic derivatives" begin
@@ -265,6 +266,121 @@ end
     @test repr(D(ex, 2)) == "∂₂my_bin_op(x1, x2)"
     @test D(ex, 1)([3.0 4.0]') ≈ [1.0]
     @test D(ex, 2)([3.0 4.0]') ≈ [8.0]
+end
+
+@testitem "Test complex derivatives" begin
+    using DynamicDiff:
+        D,
+        operator_derivative,
+        _known_nonholomorphic_operator,
+        _reject_known_nonholomorphic_operator
+    import DynamicDiff: assume_holomorphic
+    using DynamicExpressions: Expression, Node, OperatorEnum, @declare_expression_operator
+
+    square_plus_one(z) = z * z + one(z)
+    bilinear_plus_left(z, w) = z * w + z
+    custom_conj(z) = conj(z)
+    checked_calls = Ref(0)
+    checked_square(z) = (checked_calls[] += 1; z * z)
+    opted_in_calls = Ref(0)
+    opted_in_square(z) = (opted_in_calls[] += 1; z * z)
+    opted_in_binary_calls = Ref(0)
+    opted_in_product(z, w) = (opted_in_binary_calls[] += 1; z * w)
+    assume_holomorphic(::typeof(opted_in_square)) = true
+    assume_holomorphic(::typeof(opted_in_product)) = true
+    @declare_expression_operator(square_plus_one, 1)
+    @declare_expression_operator(bilinear_plus_left, 2)
+
+    operators = OperatorEnum(;
+        unary_operators=(sin, square_plus_one),
+        binary_operators=(+, -, *, /, bilinear_plus_left),
+    )
+    variable_names = ["z", "w"]
+    z, w = (
+        Expression(Node{ComplexF64}(; feature=i); operators, variable_names) for i in 1:2
+    )
+    input = reshape(ComplexF64[1 + 2im, 3 - 1im], 2, 1)
+
+    @test D(z * z + sin(z), 1)(input) ≈ [2 * input[1, 1] + cos(input[1, 1])]
+    @test D(square_plus_one(z), 1)(input) ≈ [2 * input[1, 1]]
+    @test D(D(square_plus_one(z), 1), 1)(input) ≈ ComplexF64[2]
+    @test D(bilinear_plus_left(z, w), 1)(input) ≈ [input[2, 1] + 1]
+    @test D(bilinear_plus_left(z, w), 2)(input) ≈ [input[1, 1]]
+    @test D(sin(z), 2)(input) == ComplexF64[0]
+
+    unary_derivative = operator_derivative(square_plus_one, Val(1), Val(1))
+    binary_derivative = operator_derivative(bilinear_plus_left, Val(2), Val(2))
+    for T in (Float32, Float64, BigFloat)
+        z_value = complex(T(1), T(2))
+        w_value = complex(T(3), -T(1))
+        @test @inferred(unary_derivative(z_value)) ≈ 2 * z_value
+        @test @inferred(binary_derivative(z_value, w_value)) ≈ z_value
+    end
+
+    # Unknown operators are checked in both complex directions.
+    checked_derivative = operator_derivative(checked_square, Val(1), Val(1))
+    checked_calls[] = 0
+    @test checked_derivative(1.0 + 2.0im) ≈ 2.0 + 4.0im
+    @test checked_calls[] == 2
+
+    # Explicit opt-in dispatches to the unchecked, one-direction implementation.
+    opted_in_derivative = operator_derivative(opted_in_square, Val(1), Val(1))
+    opted_in_calls[] = 0
+    @test @inferred(opted_in_derivative(1.0 + 2.0im)) ≈ 2.0 + 4.0im
+    @test opted_in_calls[] == 1
+
+    opted_in_binary_derivative = operator_derivative(opted_in_product, Val(2), Val(1))
+    opted_in_binary_calls[] = 0
+    @test @inferred(opted_in_binary_derivative(1.0 + 2.0im, 3.0 - 1.0im)) ≈ 3.0 - 1.0im
+    @test opted_in_binary_calls[] == 1
+
+    second_opted_in_derivative = operator_derivative(opted_in_derivative, Val(1), Val(1))
+    opted_in_calls[] = 0
+    @test @inferred(second_opted_in_derivative(1.0 + 2.0im)) ≈ 2.0 + 0.0im
+    @test opted_in_calls[] == 1
+
+    # Non-holomorphic custom operators fail their Cauchy-Riemann check.
+    conjugate_derivative = operator_derivative(custom_conj, Val(1), Val(1))
+    @test_throws DomainError conjugate_derivative(1.0 + 2.0im)
+    @test_throws DomainError operator_derivative(real, Val(1), Val(1))(1.0 + 2.0im)
+    @test_throws DomainError operator_derivative(imag, Val(1), Val(1))(1.0 + 2.0im)
+    # `Any` vectors force runtime dispatch; a plain tuple is unrolled and
+    # constant-folded, which hides these one-line methods from coverage.
+    for op in Any[abs, abs2, sign, conj, real, imag]
+        @test _known_nonholomorphic_operator(op)
+    end
+    for op in Any[sin, +]
+        @test !_known_nonholomorphic_operator(op)
+        @test !assume_holomorphic(op)
+    end
+
+    # Known non-holomorphic operators fail while building a dependent derivative.
+    nonholomorphic_operators = OperatorEnum(;
+        unary_operators=(abs, sign, sin), binary_operators=(+, *)
+    )
+    complex_variable = Expression(
+        Node{ComplexF64}(; feature=1);
+        operators=nonholomorphic_operators,
+        variable_names=["z"],
+    )
+    @test_throws DomainError D(abs(complex_variable), 1)
+    @test_throws DomainError D(sign(complex_variable), 1)
+    @test @inferred(
+        _reject_known_nonholomorphic_operator(
+            sin(complex_variable).tree, nonholomorphic_operators, 1
+        )
+    ) === nothing
+    @test @inferred(
+        _reject_known_nonholomorphic_operator(
+            (complex_variable * complex_variable).tree, nonholomorphic_operators, 1
+        )
+    ) === nothing
+    @test D(abs(complex_variable), 2)(reshape(ComplexF64[1 + 2im], 1, 1)) == ComplexF64[0]
+
+    # A pointwise Cauchy-Riemann check cannot prove holomorphicity in a neighbourhood.
+    abs2_derivative = operator_derivative(abs2, Val(1), Val(1))
+    @test abs2_derivative(0.0 + 0.0im) == 0.0 + 0.0im
+    @test_throws DomainError abs2_derivative(1.0 + 2.0im)
 end
 
 @testitem "Missing coverage" begin

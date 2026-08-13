@@ -88,3 +88,15 @@ derivative of an expression and then evaluate it on 32 batches:
 julia> @btime D($f, 1)(x) setup=(x = randn(2, 32));
   187.132 ns (4 allocations: 416 bytes)
 ```
+
+## Complex numbers
+
+Complex-valued expressions are supported for holomorphic operators. DynamicDiff checks
+custom operators against the Cauchy-Riemann equations and rejects known non-holomorphic
+operators. Skip the check for a custom operator known to be holomorphic with:
+
+```julia
+import DynamicDiff: assume_holomorphic
+
+assume_holomorphic(::typeof(my_operator)) = true
+```
