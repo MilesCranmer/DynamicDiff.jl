@@ -188,8 +188,8 @@ end
         op_index = node.op
         Base.Cartesian.@nif(
             $nops,
-            i -> i == op_index,
-            i ->
+            i -> i == op_index,  # COV_EXCL_LINE
+            i ->  # COV_EXCL_LINE
                 _reject_known_nonholomorphic_operator(operators[$degree][i], node, feature),
         )
     end
@@ -202,8 +202,9 @@ end
         degree = node.degree
         Base.Cartesian.@nif(
             $D,
-            d -> d == degree,
-            d -> _reject_known_nonholomorphic_operator(node, operators, feature, Val(d)),
+            d -> d == degree,  # COV_EXCL_LINE
+            d ->  # COV_EXCL_LINE
+                _reject_known_nonholomorphic_operator(node, operators, feature, Val(d)),
         )
     end
 end
