@@ -1,6 +1,6 @@
 module DynamicDiff
 
-export D, assume_holomorphic
+export D
 
 using DispatchDoctor: @stable
 

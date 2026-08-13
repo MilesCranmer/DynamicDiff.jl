@@ -16,6 +16,7 @@ end
     using DynamicDiff
     using Aqua
     Aqua.test_all(DynamicDiff)
+    @test :assume_holomorphic ∉ names(DynamicDiff)
 end
 
 @testitem "Test symbolic derivatives" begin
